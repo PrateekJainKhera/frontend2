@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DatePicker } from '@/components/ui/date-picker';
-import { ArrowLeft, CheckCircle, Clock, Play, Square, Pause } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Clock, Play, Square, Pause, MapPin } from 'lucide-react';
 import api from '@/services/api';
 import { Label } from '@/components/ui/label';
 import { SharedMapCanvas } from '@/components/maps/SharedMapCanvas';
@@ -27,19 +27,28 @@ interface PlannedVisit {
   locationName: string;
   latitude: number | null;
   longitude: number | null;
-  
+
   status: number; // 0=Pending, 1=Approved, 3=Completed
 }
 interface Session {
   startTimeIST: string;
   endTimeIST: string | null;
 }
+interface StayPoint {
+  latitude: number;
+  longitude: number;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  address?: string;
+}
 interface RouteReplayData {
   totalDistanceKm: number;
   path: LocationPoint[];
   plannedVisits: PlannedVisit[];
-  sessions: Session[]; // Add sessions to the interface
-    startTime: string;
+  sessions: Session[];
+  stayPoints: StayPoint[];
+  startTime: string;
   endTime: string | null;
 }
 
@@ -295,6 +304,7 @@ setReplayData(transformedData);
                   <SharedMapCanvas
                     segments={displaySegments}
                     markers={visitMarkers}
+                    stayPoints={replayData?.stayPoints || []}
                     showLiveLocation={false}
                     endTime={replayData?.endTime}
                     animationMode={animation.isPlaying || animation.progress > 0}
@@ -364,6 +374,38 @@ setReplayData(transformedData);
                       )}
                     </div>
                   )) : <p className="text-sm text-gray-500">No work sessions recorded for this day.</p>}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* --- NEW: STAY POINTS CARD --- */}
+          <Card>
+            <CardHeader><CardTitle>Stay Points</CardTitle></CardHeader>
+            <CardContent className="p-4 max-h-64 overflow-y-auto">
+              {isLoading ? <p>Loading...</p> : (
+                <div className="space-y-3">
+                  {replayData?.stayPoints && replayData.stayPoints.length > 0 ? replayData.stayPoints.map((stay, index) => (
+                    <div key={index} className="flex items-start gap-3 p-2 bg-orange-50 rounded-md border border-orange-200">
+                      <MapPin className="h-5 w-5 text-orange-600 shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">
+                          Stay #{index + 1}
+                        </p>
+                        <p className="text-xs text-gray-600 mt-1">
+                          {new Date(stay.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} - {new Date(stay.endTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                        <p className="text-xs font-semibold text-orange-700 mt-1">
+                          Duration: {stay.durationMinutes} min
+                        </p>
+                        {stay.address && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {stay.address}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )) : <p className="text-sm text-gray-500">No stay points detected for this day.</p>}
                 </div>
               )}
             </CardContent>

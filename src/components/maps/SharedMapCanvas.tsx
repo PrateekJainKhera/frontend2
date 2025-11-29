@@ -21,10 +21,20 @@ interface RouteSegment {
   isPredicted: boolean;
 }
 
+interface StayPointMarker {
+  latitude: number;
+  longitude: number;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  address?: string;
+}
+
 interface SharedMapCanvasProps {
   segments?: RouteSegment[]; // <-- NEW PROP
-  
+
   markers?: MapMarkerData[];
+  stayPoints?: StayPointMarker[];
   showLiveLocation?: boolean;
   snapToRoad?: boolean; // DEPRECATED: Backend now handles snapping
   endTime?: string | null;
@@ -136,6 +146,7 @@ function RouteRenderer({
 export function SharedMapCanvas({
   segments,
   markers,
+  stayPoints,
   showLiveLocation = false,
   endTime,
   animationMode = false,
@@ -200,6 +211,22 @@ export function SharedMapCanvas({
               title={`${index + 1}. ${marker.name}`}
             >
               <NumberedMarker number={index + 1} />
+            </AdvancedMarker>
+          ))}
+
+          {/* Render Stay Point Markers */}
+          {stayPoints?.map((stay, index) => (
+            <AdvancedMarker
+              key={`stay-${index}`}
+              position={{ lat: stay.latitude, lng: stay.longitude }}
+              title={`Stay Point #${index + 1} - ${stay.durationMinutes} min`}
+            >
+              <div className="bg-orange-500 text-white rounded-full w-10 h-10 flex items-center justify-center border-2 border-white shadow-lg">
+                <div className="text-center">
+                  <div className="text-xs font-bold">{stay.durationMinutes}</div>
+                  <div className="text-[8px]">min</div>
+                </div>
+              </div>
             </AdvancedMarker>
           ))}
 
