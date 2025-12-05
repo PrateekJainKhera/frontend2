@@ -298,7 +298,7 @@ setReplayData(transformedData);
         {/* Map on the left */}
         <div className="lg:col-span-2">
           <Card>
-            <CardContent className="p-2 h-96 w-full">
+            <CardContent className="p-2 h-200 w-full">
               {isLoading ? <p className="text-center p-10">Loading route...</p> : error ? <p className="text-red-500 text-center p-10">{error}</p> : (
                 displaySegments.length > 0 ? (
                   <SharedMapCanvas
