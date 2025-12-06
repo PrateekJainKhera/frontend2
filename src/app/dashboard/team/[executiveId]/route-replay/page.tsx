@@ -106,6 +106,14 @@ const transformedData = {
     longitude: point.longitude ?? point.Longitude,
     timestamp: point.timestamp ?? point.Timestamp,
     isPredicted: point.isPredicted ?? point.IsPredicted ?? false
+  })) || [],
+  stayPoints: response.data.stayPoints?.map((stay: any) => ({
+    latitude: stay.latitude ?? stay.Latitude,
+    longitude: stay.longitude ?? stay.Longitude,
+    startTime: stay.startTime ?? stay.StartTime,
+    endTime: stay.endTime ?? stay.EndTime,
+    durationMinutes: stay.durationMinutes ?? stay.DurationMinutes,
+    address: stay.address ?? stay.Address
   })) || []
 };
 
@@ -393,7 +401,7 @@ setReplayData(transformedData);
                           Stay #{index + 1}
                         </p>
                         <p className="text-xs text-gray-600 mt-1">
-                          {new Date(stay.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} - {new Date(stay.endTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                          {new Date(stay.startTime + 'Z').toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })} - {new Date(stay.endTime + 'Z').toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
                         </p>
                         <p className="text-xs font-semibold text-orange-700 mt-1">
                           Duration: {stay.durationMinutes} min
