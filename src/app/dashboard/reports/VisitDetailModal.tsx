@@ -6,8 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { MapPin, User, Calendar, Camera, MessageSquare, Users, BookOpen, ShoppingCart, Check, X, ZoomIn } from 'lucide-react';
 import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
-import { apiBaseUrl } from '@/services/api';
 import { useState } from 'react';
+
+// Image base URL (hosted on ngrok/Linux server, different from API base URL)
+const IMAGE_BASE_URL = 'http://overbashfully-mesodermal-margherita.ngrok-free.dev';
 // Backend ke DTO se match karta hua TypeScript interface
 interface VisitDetailReport {
   visitId: number;
@@ -93,11 +95,11 @@ export function VisitDetailModal({ isOpen, onClose, visitData, isLoading }: Visi
             onClick={() => setIsPhotoPreviewOpen(true)} 
             className="relative w-full aspect-square rounded-md overflow-hidden cursor-pointer group border"
           >
-            <img 
-              src={`${apiBaseUrl}/${visitData.checkInPhotoUrl}`} 
-              alt="Check-in thumbnail" 
-              className="w-full h-full object-cover" 
-            />
+         <img
+  src={`${IMAGE_BASE_URL}/${visitData.checkInPhotoUrl.replace(/\\/g, '/')}`}
+  alt="Check-in thumbnail"
+  className="w-full h-full object-cover"
+/>
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
               <ZoomIn className="text-white h-8 w-8" />
             </div>
@@ -193,16 +195,16 @@ export function VisitDetailModal({ isOpen, onClose, visitData, isLoading }: Visi
       </DialogDescription>
     </DialogHeader>
     {/* === END FIX === */}
-   <a 
-  href={visitData?.checkInPhotoUrl ? `${apiBaseUrl}/${visitData.checkInPhotoUrl}` : '#'} 
-  target="_blank" 
+<a
+  href={visitData?.checkInPhotoUrl ? `${IMAGE_BASE_URL}/${visitData.checkInPhotoUrl.replace(/\\/g, '/')}` : '#'}
+  target="_blank"
   rel="noopener noreferrer"
   title="Open image in new tab to zoom"
 >
-  <img 
-    src={visitData?.checkInPhotoUrl ? `${apiBaseUrl}/${visitData.checkInPhotoUrl}` : ''} 
-    alt="Check-in full preview" 
-    className="w-full h-auto rounded-md" 
+  <img
+    src={visitData?.checkInPhotoUrl ? `${IMAGE_BASE_URL}/${visitData.checkInPhotoUrl.replace(/\\/g, '/')}` : ''}
+    alt="Check-in full preview"
+    className="w-full h-auto rounded-md"
   />
 </a>
   </DialogContent>
@@ -210,3 +212,4 @@ export function VisitDetailModal({ isOpen, onClose, visitData, isLoading }: Visi
      </> 
   );
 }
+
