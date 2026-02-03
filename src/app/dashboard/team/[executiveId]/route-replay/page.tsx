@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect ,useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,7 +21,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 
 // --- Interfaces ---
-interface LocationPoint { latitude: number; longitude: number;  timestamp: string; isPredicted?: boolean; }
+interface LocationPoint { latitude: number; longitude: number; timestamp: string; isPredicted?: boolean; }
 interface PlannedVisit {
   locationId: number;
   locationName: string;
@@ -50,6 +50,9 @@ interface RouteReplayData {
   stayPoints: StayPoint[];
   startTime: string;
   endTime: string | null;
+  // Raw start/end points from DB for accurate flag placement
+ // rawStartPoint?: LocationPoint;
+  rawEndPoint?: LocationPoint;
 }
 
 export default function RouteReplayPage() {
@@ -64,7 +67,7 @@ export default function RouteReplayPage() {
   const [executiveName, setExecutiveName] = useState('');
   const [speed, setSpeed] = useState<number>(1);
   const [cameraFollow, setCameraFollow] = useState<boolean>(true);
-useEffect(() => {
+  useEffect(() => {
     const fetchExecutiveName = async () => {
       if (!executiveId) return;
       try {
@@ -90,34 +93,45 @@ useEffect(() => {
         // Adjust the date to noon in the local timezone before sending
         const adjustedDate = new Date(selectedDate);
         adjustedDate.setHours(12, 0, 0, 0);
-        
-       const response = await api.get('/tracking/history', {
-  params: { 
-    executiveId, 
-    date: adjustedDate.toISOString()
-  }
-});
 
-// Transform the response to handle C# Pascal Case -> JavaScript camelCase
-const transformedData = {
-  ...response.data,
-  path: response.data.path?.map((point: any) => ({
-    latitude: point.latitude ?? point.Latitude,
-    longitude: point.longitude ?? point.Longitude,
-    timestamp: point.timestamp ?? point.Timestamp,
-    isPredicted: point.isPredicted ?? point.IsPredicted ?? false
-  })) || [],
-  stayPoints: response.data.stayPoints?.map((stay: any) => ({
-    latitude: stay.latitude ?? stay.Latitude,
-    longitude: stay.longitude ?? stay.Longitude,
-    startTime: stay.startTime ?? stay.StartTime,
-    endTime: stay.endTime ?? stay.EndTime,
-    durationMinutes: stay.durationMinutes ?? stay.DurationMinutes,
-    address: stay.address ?? stay.Address
-  })) || []
-};
+        const response = await api.get('/tracking/history', {
+          params: {
+            executiveId,
+            date: adjustedDate.toISOString()
+          }
+        });
 
-setReplayData(transformedData);
+        // Transform the response to handle C# Pascal Case -> JavaScript camelCase
+        const transformedData = {
+          ...response.data,
+          path: response.data.path?.map((point: any) => ({
+            latitude: point.latitude ?? point.Latitude,
+            longitude: point.longitude ?? point.Longitude,
+            timestamp: point.timestamp ?? point.Timestamp,
+            isPredicted: point.isPredicted ?? point.IsPredicted ?? false
+          })) || [],
+          stayPoints: response.data.stayPoints?.map((stay: any) => ({
+            latitude: stay.latitude ?? stay.Latitude,
+            longitude: stay.longitude ?? stay.Longitude,
+            startTime: stay.startTime ?? stay.StartTime,
+            endTime: stay.endTime ?? stay.EndTime,
+            durationMinutes: stay.durationMinutes ?? stay.DurationMinutes,
+            address: stay.address ?? stay.Address
+          })) || [],
+          // Transform raw start/end points for accurate flag placement
+          // rawStartPoint: response.data.rawStartPoint ? {
+          //   latitude: response.data.rawStartPoint.latitude ?? response.data.rawStartPoint.Latitude,
+          //   longitude: response.data.rawStartPoint.longitude ?? response.data.rawStartPoint.Longitude,
+          //   timestamp: response.data.rawStartPoint.timestamp ?? response.data.rawStartPoint.Timestamp
+          // } : undefined,
+          rawEndPoint: response.data.rawEndPoint ? {
+            latitude: response.data.rawEndPoint.latitude ?? response.data.rawEndPoint.Latitude,
+            longitude: response.data.rawEndPoint.longitude ?? response.data.rawEndPoint.Longitude,
+            timestamp: response.data.rawEndPoint.timestamp ?? response.data.rawEndPoint.Timestamp
+          } : undefined
+        };
+
+        setReplayData(transformedData);
       } catch (err: any) {
         setError(err.response?.data?.message || "Failed to fetch route history.");
       } finally {
@@ -196,11 +210,11 @@ setReplayData(transformedData);
     <div className="space-y-6">
       <Button variant="outline" onClick={() => router.back()}><ArrowLeft className="h-4 w-4 mr-2" /> Back to Team</Button>
       <h2 className="text-2xl font-bold">Route Replay
-          {executiveName && (
-    <span className="text-gray-500 font-normal text-lg">
-      - {executiveName}
-    </span>
-  )}
+        {executiveName && (
+          <span className="text-gray-500 font-normal text-lg">
+            - {executiveName}
+          </span>
+        )}
       </h2>
 
       <Card>
@@ -322,6 +336,8 @@ setReplayData(transformedData);
                       replayData?.path[animation.currentIndex]?.isPredicted || false
                     }
                     cameraFollow={cameraFollow}
+//rawStartPoint={replayData?.rawStartPoint}
+                    rawEndPoint={replayData?.rawEndPoint}
                   />
                 ) : <p className="text-center p-10">No tracking data found for the selected date.</p>
               )}
@@ -337,25 +353,25 @@ setReplayData(transformedData);
               {isLoading ? <p>Loading...</p> : (
                 <div className="space-y-4">
                   {visitMarkers.length > 0 ? visitMarkers.map((visit, index) => ( // Add 'index' here
-  <div key={`${visit.id}-${index}`} className="flex items-start gap-3"> 
-    {/* The key is now a combination of id and index, e.g., "123-0", "456-1", "123-2" */}
-    <div className="shrink-0 mt-1">
-      {visit.status === 3 ? (
-        <CheckCircle className="h-5 w-5 text-green-500" />
-      ) : (
-        <Clock className="h-5 w-5 text-gray-400" />
-      )}
-    </div>
-    <div>
-      <p className={`font-medium ${visit.status === 3 ? 'text-gray-500 line-through' : ''}`}>
-        {visit.name}
-      </p>
-      <p className="text-xs text-gray-500">
-        {visit.status === 3 ? 'Completed' : 'Pending'}
-      </p>
-    </div>
-  </div>
-)) : <p className="text-sm text-gray-500">No visits were completed on this day.</p>}
+                    <div key={`${visit.id}-${index}`} className="flex items-start gap-3">
+                      {/* The key is now a combination of id and index, e.g., "123-0", "456-1", "123-2" */}
+                      <div className="shrink-0 mt-1">
+                        {visit.status === 3 ? (
+                          <CheckCircle className="h-5 w-5 text-green-500" />
+                        ) : (
+                          <Clock className="h-5 w-5 text-gray-400" />
+                        )}
+                      </div>
+                      <div>
+                        <p className={`font-medium ${visit.status === 3 ? 'text-gray-500 line-through' : ''}`}>
+                          {visit.name}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {visit.status === 3 ? 'Completed' : 'Pending'}
+                        </p>
+                      </div>
+                    </div>
+                  )) : <p className="text-sm text-gray-500">No visits were completed on this day.</p>}
                 </div>
               )}
             </CardContent>

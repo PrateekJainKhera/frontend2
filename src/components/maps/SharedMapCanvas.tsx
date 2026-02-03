@@ -13,7 +13,7 @@ interface MapMarkerData {
   name: string;
   latitude: number;
   longitude: number;
-    status: number; // We'll use this for the icon
+  status: number; // We'll use this for the icon
 
 }
 interface RouteSegment {
@@ -44,6 +44,9 @@ interface SharedMapCanvasProps {
   animatedBearing?: number;
   isPredictedSegment?: boolean;
   cameraFollow?: boolean;
+  // Raw start/end points from DB for accurate flag placement
+  //rawStartPoint?: { latitude: number; longitude: number; timestamp?: string };
+  rawEndPoint?: { latitude: number; longitude: number; timestamp?: string };
 }
 
 // --- Helper Components ---
@@ -153,15 +156,24 @@ export function SharedMapCanvas({
   animatedPosition = null,
   animatedBearing = 0,
   isPredictedSegment = false,
-  cameraFollow = true
+  cameraFollow = true,
+ // rawStartPoint,
+  rawEndPoint
 }: SharedMapCanvasProps) {
   const defaultCenter = markers?.[0]
     ? { lat: markers[0].latitude, lng: markers[0].longitude }
     : { lat: 22.7196, lng: 75.8577 };
 
+  // Calculate path endpoints from segments (used as fallback if raw points not provided)
  const startPoint = segments && segments.length > 0 ? segments[0].path[0] : null;
   const lastSegment = segments && segments.length > 0 ? segments[segments.length - 1] : null;
-  const endPoint = lastSegment && lastSegment.path.length > 0 ? lastSegment.path[lastSegment.path.length - 1] : null;
+  const pathEndPoint = lastSegment && lastSegment.path.length > 0 ? lastSegment.path[lastSegment.path.length - 1] : null;
+
+  // Use raw points for accurate flag placement, fallback to path endpoints
+
+  const endPoint = rawEndPoint
+    ? { lat: rawEndPoint.latitude, lng: rawEndPoint.longitude }
+    : pathEndPoint;
 
   // Removed: useState and useEffect for frontend snapping
   // The path from backend is already optimized
@@ -185,7 +197,7 @@ export function SharedMapCanvas({
 
           {showLiveLocation && <CurrentPositionMarker />}
 
-        {/* Render Start Marker (Always show if path exists) */}
+          {/* Render Start Marker at first GPS tracking point */}
           {startPoint && !showLiveLocation && !animationMode && (
             <AdvancedMarker position={startPoint} title="Start of Day">
               <div className="bg-green-500 text-white rounded-full w-8 h-8 flex items-center justify-center border-2 border-white shadow-lg">
