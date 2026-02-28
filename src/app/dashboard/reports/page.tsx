@@ -1,4 +1,5 @@
 'use client';
+import * as XLSX from 'xlsx';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,7 @@ import { DatePickerWithRange } from '@/components/ui/date-range-picker';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
-import  { Download, Search, Eye, BarChart2, Users, IndianRupee, Route } from 'lucide-react'; // Icons update karein
+import { Download, Search, Eye, BarChart2, Users, IndianRupee, Route } from 'lucide-react'; // Icons update karein
 import api from '@/services/api';
 import { DateRange } from 'react-day-picker';
 import { useAuthContext } from '@/context/AuthContext';
@@ -19,9 +20,11 @@ import { LocationVisitHistoryModal } from './LocationVisitHistoryModal';
 import { ToggleLeft, ToggleRight } from 'lucide-react';
 
 // Interfaces 
-interface PerformanceSummary { executiveId: number; executiveName: string; roleName: string; totalVisits: number; plannedVisits: number; totalDistanceKm: number; totalExpenses: number; booksDistributed: number;  totalTA: number;
+interface PerformanceSummary {
+  executiveId: number; executiveName: string; roleName: string; totalVisits: number; plannedVisits: number; totalDistanceKm: number; totalExpenses: number; booksDistributed: number; totalTA: number;
   totalDA: number;
-  otherExpenses: number; }
+  otherExpenses: number;
+}
 
 interface DetailedVisit { id: number; visitDate: string; executiveName: string; locationName: string; locationType: string; area: string; principalRemarks: string | null; locationVisitCount: number; }
 
@@ -72,7 +75,7 @@ interface VisitDetailReport {
     placedOrders: { bookTitle: string; quantity: number; }[];
   }[];
 }
-type ReportTab = 'performance' | 'visits' | 'expenses' | 'inventory'| 'workday'; 
+type ReportTab = 'performance' | 'visits' | 'expenses' | 'inventory' | 'workday';
 
 // Ye function date ko UTC me convert kiye bina, usko 'YYYY-MM-DD' format me badalta hai
 const formatDateForApi = (date: Date): string => {
@@ -86,11 +89,11 @@ const formatDateForApi = (date: Date): string => {
 export default function ReportsPage() {
   const { user: currentUser } = useAuthContext();
   const [activeTab, setActiveTab] = useState<ReportTab>('performance');
-  
+
   const [executives, setExecutives] = useState<{ id: number; name: string }[]>([]);
   const [selectedExecutiveId, setSelectedExecutiveId] = useState<string>('all');
   const getDateMinusDays = (days: number) => { const date = new Date(); date.setDate(date.getDate() - days); return date; };
- const [dateRange, setDateRange] = useState<DateRange | undefined>({ from: getDateMinusDays(6), to: new Date() }); 
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({ from: getDateMinusDays(6), to: new Date() });
   const [performanceData, setPerformanceData] = useState<PerformanceSummary[]>([]);
   const [visitData, setVisitData] = useState<DetailedVisit[]>([]);
   const [locationSummaryData, setLocationSummaryData] = useState<LocationSummary[]>([]);
@@ -103,10 +106,11 @@ export default function ReportsPage() {
   // Client-side pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 15;
-   const [isVisitModalOpen, setIsVisitModalOpen] = useState(false);
+  const [isVisitModalOpen, setIsVisitModalOpen] = useState(false);
   const [selectedVisitDetails, setSelectedVisitDetails] = useState<VisitDetailReport | null>(null);
   const [isModalLoading, setIsModalLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExtractingComplete, setIsExtractingComplete] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [selectedLocationHistory, setSelectedLocationHistory] = useState<VisitHistoryItem[]>([]);
   const [selectedLocationName, setSelectedLocationName] = useState('');
@@ -117,18 +121,18 @@ export default function ReportsPage() {
       api.get('/executives').then(res => setExecutives(res.data));
     }
   }, [currentUser]);
-  const fetchReports = useCallback(async (page = 1) => {     
+  const fetchReports = useCallback(async (page = 1) => {
     if (!dateRange?.from || !dateRange?.to) { alert("Please select a valid date range."); return; }
     setIsLoading(true);
     try {
-       // --- YEH HAI FIX: toISOString() ki jagah naya function use karein ---
+      // --- YEH HAI FIX: toISOString() ki jagah naya function use karein ---
       const params = {
         startDate: formatDateForApi(dateRange.from),
         endDate: formatDateForApi(dateRange.to),
         executiveId: selectedExecutiveId === 'all' ? undefined : parseInt(selectedExecutiveId),
-       pageNumber: page, // <-- Page number bhejein
+        pageNumber: page, // <-- Page number bhejein
         pageSize: 15    // <-- Page size bhejein
-     
+
       };
       const [perfRes, visitRes, locationSummaryRes, expenseRes, inventoryRes, workdayRes] = await Promise.all([
         api.get('/reports/performance-summary', { params }),
@@ -136,7 +140,7 @@ export default function ReportsPage() {
         api.get('/reports/locations-summary', { params }),
         api.get('/reports/expenses', { params }),
         api.get('/reports/inventory-log', { params }),
-        api.get('/reports/workday-summary', { params }) 
+        api.get('/reports/workday-summary', { params })
       ]);
       setPerformanceData(perfRes.data);
       setVisitData(visitRes.data);
@@ -149,15 +153,15 @@ export default function ReportsPage() {
     } catch (error) { console.error("Failed to generate reports:", error); alert("Failed to generate reports."); }
     finally { setIsLoading(false); }
   }, [dateRange, selectedExecutiveId]);
-  
-useEffect(() => {
-  // Ye check zaroori hai taaki page load hote hi report generate na ho,
-  // sirf "Generate Report" button ya "Eye" icon par click karne par ho.
-  // Hum check kar rahe hain ki kya data pehle se loaded hai.
-  if (performanceData.length > 0 || visitData.length > 0 || expenseData.length > 0) {
-    fetchReports();
-  }
-}, [selectedExecutiveId, dateRange]);
+
+  useEffect(() => {
+    // Ye check zaroori hai taaki page load hote hi report generate na ho,
+    // sirf "Generate Report" button ya "Eye" icon par click karne par ho.
+    // Hum check kar rahe hain ki kya data pehle se loaded hai.
+    if (performanceData.length > 0 || visitData.length > 0 || expenseData.length > 0) {
+      fetchReports();
+    }
+  }, [selectedExecutiveId, dateRange]);
 
   // Reset page when tab changes
   useEffect(() => {
@@ -274,16 +278,82 @@ useEffect(() => {
     }
   };
 
+  // --- EXTRACT COMPLETE DAILY REPORT AS EXCEL ---
+  const extractCompleteDailyReport = async () => {
+    if (!dateRange?.from || !dateRange?.to) { alert("Please select a date range first."); return; }
+    setIsExtractingComplete(true);
+    try {
+      const params = {
+        startDate: formatDateForApi(dateRange.from),
+        endDate: formatDateForApi(dateRange.to),
+        executiveId: selectedExecutiveId === 'all' ? undefined : parseInt(selectedExecutiveId),
+      };
+      const response = await api.get('/reports/complete-daily-report', { params });
+      const data = response.data;
+      if (!data || data.length === 0) { alert("No data found for the selected range."); return; }
 
-  
-// Jab bhi executive ya date range badle, ye chalega
+      // Map API data to readable Excel columns
+      const excelData = data.map((row: any) => ({
+        'Executive': row.executive,
+        'Role': row.role,
+        'Date': row.date,
+        'Start Day': row.startDay,
+        'End Day': row.endDay,
+        'Distance (KM)': row.distanceKm,
+        'Visits': row.visits,
+        'Location Names': row.locationNames,
+        'Type': row.type,
+        'Area': row.area,
+        'Total Visits': row.totalVisitsPerLocation,
+        'Last Visit': row.lastVisitPerLocation,
+        'Total TA (₹)': row.totalTA,
+        'Total DA (₹)': row.totalDA,
+        'Other Exp (₹)': row.otherExp,
+        'Total Exp (₹)': row.totalExp,
+        'Books Given': row.booksGiven,
+        'Book Title': row.bookTitles,
+        'Teacher Name': row.teacherNames,
+        'Quantity': row.quantity,
+      }));
+
+      // Create Excel workbook
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+      // Auto-size columns based on content
+      const colWidths = Object.keys(excelData[0]).map((key) => {
+        const maxLen = Math.max(
+          key.length,
+          ...excelData.map((row: any) => String(row[key] ?? '').length)
+        );
+        return { wch: Math.min(maxLen + 2, 60) };
+      });
+      worksheet['!cols'] = colWidths;
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Complete Daily Report');
+
+      // Generate filename with date range
+      const fromStr = formatDateForApi(dateRange.from).replace(/-/g, '');
+      const toStr = formatDateForApi(dateRange.to).replace(/-/g, '');
+      XLSX.writeFile(workbook, `Complete_Daily_Report_${fromStr}_to_${toStr}.xlsx`);
+    } catch (error) {
+      console.error("Failed to extract complete report:", error);
+      alert("Failed to extract report.");
+    } finally {
+      setIsExtractingComplete(false);
+    }
+  };
+
+
+
+  // Jab bhi executive ya date range badle, ye chalega
   // --- NAYA FEATURE #1: Executive 360° View ---
   const handleExecutiveFocus = (execId: number) => {
     setSelectedExecutiveId(execId.toString());
     // Automatically generate report for this executive
     // fetchReports();
   };
-const handlePresetDateRange = (preset: 'today' | 'yesterday' | 'week' | 'month') => {
+  const handlePresetDateRange = (preset: 'today' | 'yesterday' | 'week' | 'month') => {
     const today = new Date();
     let fromDate: Date;
     let toDate: Date = new Date(); // End date is always today for these presets
@@ -309,7 +379,7 @@ const handlePresetDateRange = (preset: 'today' | 'yesterday' | 'week' | 'month')
     }
     setDateRange({ from: fromDate, to: toDate });
   };
-   const exportToCsv = (filename: string, data: any[]) => {
+  const exportToCsv = (filename: string, data: any[]) => {
     if (data.length === 0) {
       alert("No data to export.");
       return;
@@ -320,7 +390,7 @@ const handlePresetDateRange = (preset: 'today' | 'yesterday' | 'week' | 'month')
       if (value === null || value === undefined) {
         return ''; // null ya undefined ko khaali chhod dein
       }
-      
+
       let stringValue = String(value);
       // Agar value me comma, double-quote, ya newline hai, toh usko quotes me daalein
       if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
@@ -332,11 +402,11 @@ const handlePresetDateRange = (preset: 'today' | 'yesterday' | 'week' | 'month')
     };
     const csvContent = [
       headers.join(','), // Header row
-      ...data.map(row => 
+      ...data.map(row =>
         headers.map(header => formatValue(row[header])).join(',')
       ) // Data rows
     ].join('\n');
-    
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     if (link.download !== undefined) {
@@ -351,7 +421,7 @@ const handlePresetDateRange = (preset: 'today' | 'yesterday' | 'week' | 'month')
   };
   function getExpenseTypeText(type: number) { return type === 1 ? "DA" : type === 0 ? "TA" : "Other"; }
   function getStatusText(status: number) { return status === 1 ? "Approved" : status === 2 ? "Rejected" : "Pending"; }
- const kpiData = useMemo(() => {
+  const kpiData = useMemo(() => {
     if (performanceData.length === 0) {
       return { totalVisits: 0, totalExpenses: 0, totalDistance: 0, activeExecutives: 0 };
     }
@@ -425,16 +495,25 @@ const handlePresetDateRange = (preset: 'today' | 'yesterday' | 'week' | 'month')
               </Select>
             </div>
           )}
-             <Button 
-            onClick={() => fetchReports(1)} // Hamesha pehla page fetch karein
-            disabled={isLoading} 
+          <Button
+            onClick={() => fetchReports(1)}
+            disabled={isLoading}
             className="w-full sm:w-auto"
           >
             {isLoading ? 'Generating...' : 'Generate Report'}
           </Button>
+          <Button
+            onClick={extractCompleteDailyReport}
+            disabled={isExtractingComplete}
+            variant="outline"
+            className="w-full sm:w-auto"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            {isExtractingComplete ? 'Extracting...' : 'Extract Complete Report'}
+          </Button>
         </CardContent>
       </Card>
- {performanceData.length > 0 && (
+      {performanceData.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard title="Total Visits" value={kpiData.totalVisits.toLocaleString()} icon={BarChart2} color="text-blue-500" />
           <KpiCard title="Total Expenses" value={`₹${kpiData.totalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={IndianRupee} color="text-green-500" />
@@ -444,12 +523,12 @@ const handlePresetDateRange = (preset: 'today' | 'yesterday' | 'week' | 'month')
       )}
       <Card>
         <CardHeader className="p-0">
-<div className="flex space-x-4 overflow-x-auto whitespace-nowrap px-4 border-b">
+          <div className="flex space-x-4 overflow-x-auto whitespace-nowrap px-4 border-b">
             <TabButton name="Performance" tab="performance" activeTab={activeTab} setActiveTab={setActiveTab} />
             <TabButton name="Visit Log" tab="visits" activeTab={activeTab} setActiveTab={setActiveTab} />
             <TabButton name="Expense Log" tab="expenses" activeTab={activeTab} setActiveTab={setActiveTab} />
             <TabButton name="Inventory Log" tab="inventory" activeTab={activeTab} setActiveTab={setActiveTab} />
-             <TabButton name="Workday Summary" tab="workday" activeTab={activeTab} setActiveTab={setActiveTab} />
+            <TabButton name="Workday Summary" tab="workday" activeTab={activeTab} setActiveTab={setActiveTab} />
 
           </div>
         </CardHeader>
@@ -516,11 +595,11 @@ const handlePresetDateRange = (preset: 'today' | 'yesterday' | 'week' | 'month')
               {activeTab === 'expenses' && (
                 <>
                   <ReportTable
-                    data={paginatedExpenseData.items.map(e => ({...e, type: getExpenseTypeText(e.type), status: getStatusText(e.status)}))}
+                    data={paginatedExpenseData.items.map(e => ({ ...e, type: getExpenseTypeText(e.type), status: getStatusText(e.status) }))}
                     columns={['expenseDate', 'executiveName', 'type', 'status', 'amount']}
                     onExport={() => exportToCsv('expense_log', expenseData)}
                     activeTab={activeTab}
-                    onViewVisitDetails={() => {}}
+                    onViewVisitDetails={() => { }}
                     isExporting={isExporting}
                   />
                   {paginatedExpenseData.totalPages > 1 && (
@@ -541,7 +620,7 @@ const handlePresetDateRange = (preset: 'today' | 'yesterday' | 'week' | 'month')
                     columns={['date', 'executiveName', 'bookTitle', 'teacherName', 'quantity']}
                     onExport={() => exportToCsv('inventory_log', inventoryData)}
                     activeTab={activeTab}
-                    onViewVisitDetails={() => {}}
+                    onViewVisitDetails={() => { }}
                     isExporting={isExporting}
                   />
                   {paginatedInventoryData.totalPages > 1 && (
@@ -555,16 +634,16 @@ const handlePresetDateRange = (preset: 'today' | 'yesterday' | 'week' | 'month')
                 </>
               )}
 
-   {activeTab === 'workday' && workdayData && (
+              {activeTab === 'workday' && workdayData && (
                 <>
-              <ReportTable 
-  data={workdayData.items} 
-  columns={['date', 'name', 'startTime', 'endTime', 'totalDistanceKm', 'sessions']} 
-  onExport={() => exportToCsv('workday_summary', workdayData.items)} 
-  activeTab={activeTab} 
-  onViewVisitDetails={() => {}}
-  isExporting={isExporting}
-/>
+                  <ReportTable
+                    data={workdayData.items}
+                    columns={['date', 'name', 'startTime', 'endTime', 'totalDistanceKm', 'sessions']}
+                    onExport={() => exportToCsv('workday_summary', workdayData.items)}
+                    activeTab={activeTab}
+                    onViewVisitDetails={() => { }}
+                    isExporting={isExporting}
+                  />
                   {/* --- YEH NAYA PAGINATION UI ADD KAREIN --- */}
                   <PaginationControls
                     currentPage={currentPage}
@@ -574,12 +653,12 @@ const handlePresetDateRange = (preset: 'today' | 'yesterday' | 'week' | 'month')
                   />
                 </>
               )}
-                
+
             </>
           )}
         </CardContent>
       </Card>
-  <VisitDetailModal
+      <VisitDetailModal
         isOpen={isVisitModalOpen}
         onClose={() => setIsVisitModalOpen(false)}
         visitData={selectedVisitDetails}
@@ -657,7 +736,7 @@ const LocationSummaryTable = ({ data, onViewHistory, onViewLatestVisit, onExport
                       onClick={() => onViewHistory(location.locationId, location.locationType, location.locationName)}
                       title="View all visits"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="m7 16 4-4 4 4 6-6"/></svg>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18" /><path d="m7 16 4-4 4 4 6-6" /></svg>
                     </Button>
                     <Button
                       variant="ghost"
@@ -746,7 +825,7 @@ const PerformanceTable = ({ data, onFocus, onExport }: { data: PerformanceSummar
           <TableRow>
             <TableHead>Executive</TableHead>
             <TableHead>Role</TableHead>
-             <TableHead className="text-right">Planned Visits</TableHead>
+            <TableHead className="text-right">Planned Visits</TableHead>
             <TableHead className="text-right">Visits</TableHead>
             <TableHead className="text-right">Distance (KM)</TableHead>
             {/* Naye Columns */}
@@ -758,56 +837,56 @@ const PerformanceTable = ({ data, onFocus, onExport }: { data: PerformanceSummar
             <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
-      <TableBody>
-  {data.map(item => {
-    const rowContent = (
-      <TableRow 
-        key={item.executiveId}
-        className="cursor-pointer"
-        onClick={() => onFocus(item.executiveId)}
-      >
-        <TableCell className="font-medium">{item.executiveName}</TableCell>
-        <TableCell>{item.roleName}</TableCell>
-        <TableCell className="text-right">{item.plannedVisits}</TableCell>
-        <TableCell className="text-right">{item.totalVisits}</TableCell>
-        <TableCell className="text-right">{item.totalDistanceKm.toFixed(2)}</TableCell>
-        <TableCell className="text-right">{item.totalTA.toFixed(2)}</TableCell>
-        <TableCell className="text-right">{item.totalDA.toFixed(2)}</TableCell>
-        <TableCell className="text-right">{item.otherExpenses.toFixed(2)}</TableCell>
-        <TableCell className="text-right font-bold">{item.totalExpenses.toFixed(2)}</TableCell>
-        <TableCell className="text-right">{item.booksDistributed}</TableCell>
-        <TableCell>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={(e) => { 
-              e.stopPropagation();
-              onFocus(item.executiveId); 
-            }}
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
-        </TableCell>
-      </TableRow>
-    );
-    return rowContent;
-  })}
-</TableBody>
+        <TableBody>
+          {data.map(item => {
+            const rowContent = (
+              <TableRow
+                key={item.executiveId}
+                className="cursor-pointer"
+                onClick={() => onFocus(item.executiveId)}
+              >
+                <TableCell className="font-medium">{item.executiveName}</TableCell>
+                <TableCell>{item.roleName}</TableCell>
+                <TableCell className="text-right">{item.plannedVisits}</TableCell>
+                <TableCell className="text-right">{item.totalVisits}</TableCell>
+                <TableCell className="text-right">{item.totalDistanceKm.toFixed(2)}</TableCell>
+                <TableCell className="text-right">{item.totalTA.toFixed(2)}</TableCell>
+                <TableCell className="text-right">{item.totalDA.toFixed(2)}</TableCell>
+                <TableCell className="text-right">{item.otherExpenses.toFixed(2)}</TableCell>
+                <TableCell className="text-right font-bold">{item.totalExpenses.toFixed(2)}</TableCell>
+                <TableCell className="text-right">{item.booksDistributed}</TableCell>
+                <TableCell>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onFocus(item.executiveId);
+                    }}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            );
+            return rowContent;
+          })}
+        </TableBody>
       </Table>
     </div>
   </div>
 );
 // Generic Report Table with Search and Export
-const ReportTable = ({ data, columns, onExport, activeTab, onViewVisitDetails, isExporting }: { 
-  data: any[], 
-  columns: string[], 
+const ReportTable = ({ data, columns, onExport, activeTab, onViewVisitDetails, isExporting }: {
+  data: any[],
+  columns: string[],
   onExport: () => void,
   activeTab: ReportTab,
   onViewVisitDetails: (id: number) => void,
   isExporting: boolean // <-- YEH LINE ADD KAREIN
 }) => {
-    const [filters, setFilters] = useState<Record<string, string>>({});
-  
+  const [filters, setFilters] = useState<Record<string, string>>({});
+
   const filteredData = useMemo(() => {
     return data.filter(row => {
       return Object.entries(filters).every(([key, value]) => {
@@ -820,19 +899,19 @@ const ReportTable = ({ data, columns, onExport, activeTab, onViewVisitDetails, i
     setFilters(prev => ({ ...prev, [key]: value }));
   };
   const headers = columns.map(col => col.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()));
-  
-   if (columns.includes('totalDistanceKm') && columns.includes('sessions')) {
+
+  if (columns.includes('totalDistanceKm') && columns.includes('sessions')) {
     return (
       <div className="space-y-4">
         <div className="flex justify-end">
-        <Button variant="outline" size="sm" onClick={onExport} disabled={isExporting}>
-          <Download className="h-4 w-4 mr-2" />
-          {isExporting ? 'Exporting...' : 'Export'}
-        </Button>
-      </div>
-        
+          <Button variant="outline" size="sm" onClick={onExport} disabled={isExporting}>
+            <Download className="h-4 w-4 mr-2" />
+            {isExporting ? 'Exporting...' : 'Export'}
+          </Button>
+        </div>
+
         {/* Table Headers */}
-<div className="hidden md:grid grid-cols-12 gap-4 px-4 py-2 text-sm font-semibold text-black border-b">
+        <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-2 text-sm font-semibold text-black border-b">
           <div className="col-span-2">Date</div>
           <div className="col-span-4">Executive Name</div>
           <div className="col-span-2">First Start</div>
@@ -854,14 +933,14 @@ const ReportTable = ({ data, columns, onExport, activeTab, onViewVisitDetails, i
                 </div>
                 {/* Mobile View */}
                 <div className="grid md:hidden grid-cols-2 gap-x-4 gap-y-2 w-full text-left">
-                    <div className="col-span-2">
-                        <p className="font-bold text-base">{row.name}</p>
-                        <p className="text-xs text-gray-500">{row.date}</p>
-                    </div>
-                    <div className="col-span-2 border-t pt-2 mt-2">
-                        <p className="text-xs text-gray-500">Distance</p>
-                        <p className="font-bold text-xl">{row.totalDistanceKm.toFixed(2)} km</p>
-                    </div>
+                  <div className="col-span-2">
+                    <p className="font-bold text-base">{row.name}</p>
+                    <p className="text-xs text-gray-500">{row.date}</p>
+                  </div>
+                  <div className="col-span-2 border-t pt-2 mt-2">
+                    <p className="text-xs text-gray-500">Distance</p>
+                    <p className="font-bold text-xl">{row.totalDistanceKm.toFixed(2)} km</p>
+                  </div>
                 </div>
               </AccordionTrigger>
               <AccordionContent className="p-4 border-t">
@@ -889,89 +968,89 @@ const ReportTable = ({ data, columns, onExport, activeTab, onViewVisitDetails, i
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
         <Button variant="outline" size="sm" onClick={onExport}><Download className="h-4 w-4 mr-2" />Export</Button>
       </div>
-       <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            {headers.map(header => <TableHead key={header}>{header}</TableHead>)}
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {headers.map(header => <TableHead key={header}>{header}</TableHead>)}
               {activeTab === 'visits' && <TableHead>Actions</TableHead>}
-          </TableRow>
-          {/* --- NAYA FEATURE #3: Column-wise Search --- */}
-          <TableRow>
-            {columns.map(col => (
-              <TableHead key={`${col}-filter`} className="p-1">
-                <div className="relative">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400" />
-                  <Input
-                    placeholder={`Search ${headers[columns.indexOf(col)]}...`}
-                    value={filters[col] || ''}
-                    onChange={(e) => handleFilterChange(col, e.target.value)}
-                    className="h-8 pl-6"
-                  />
-                </div>
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-  {filteredData.map((row, rowIndex) => {
-    // --- YEH HAI FINAL FIX ---
-    // Hum har row ke liye JSX ko ek variable me store karenge
-    // aur fir us variable ko return karenge. Isse whitespace ka chance khatam ho jaata hai.
-    const rowContent = (
-      <TableRow 
-        key={rowIndex}
-        className={activeTab === 'visits' ? 'cursor-pointer' : ''}
-        onClick={activeTab === 'visits' ? () => onViewVisitDetails(row.id) : undefined}
-      >
-        {columns.map(col => (
-          <TableCell key={col}>
-            {col.toLowerCase().includes('date') ? (
-              new Date(row[col]).toLocaleString('en-IN', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: true
-              })
-            ) : col === 'principalRemarks' ? (
-              <p title={row[col] || ''} className="max-w-xs truncate">
-                {row[col] || 'N/A'}
-              </p>
-            ) : (
-              typeof row[col] === 'number' ? row[col].toFixed(2) : row[col]
-            )}
-          </TableCell>
-        ))}
-        {activeTab === 'visits' && (
-          <TableCell>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={(e) => { 
-                e.stopPropagation(); 
-                onViewVisitDetails(row.id); 
-              }}
-            >
-              <Eye className="h-4 w-4" />
-            </Button>
-          </TableCell>
-        )}
-      </TableRow>
-    );
-    return rowContent;
-  })}
-</TableBody>
-      </Table>
+            </TableRow>
+            {/* --- NAYA FEATURE #3: Column-wise Search --- */}
+            <TableRow>
+              {columns.map(col => (
+                <TableHead key={`${col}-filter`} className="p-1">
+                  <div className="relative">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400" />
+                    <Input
+                      placeholder={`Search ${headers[columns.indexOf(col)]}...`}
+                      value={filters[col] || ''}
+                      onChange={(e) => handleFilterChange(col, e.target.value)}
+                      className="h-8 pl-6"
+                    />
+                  </div>
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredData.map((row, rowIndex) => {
+              // --- YEH HAI FINAL FIX ---
+              // Hum har row ke liye JSX ko ek variable me store karenge
+              // aur fir us variable ko return karenge. Isse whitespace ka chance khatam ho jaata hai.
+              const rowContent = (
+                <TableRow
+                  key={rowIndex}
+                  className={activeTab === 'visits' ? 'cursor-pointer' : ''}
+                  onClick={activeTab === 'visits' ? () => onViewVisitDetails(row.id) : undefined}
+                >
+                  {columns.map(col => (
+                    <TableCell key={col}>
+                      {col.toLowerCase().includes('date') ? (
+                        new Date(row[col]).toLocaleString('en-IN', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                          hour12: true
+                        })
+                      ) : col === 'principalRemarks' ? (
+                        <p title={row[col] || ''} className="max-w-xs truncate">
+                          {row[col] || 'N/A'}
+                        </p>
+                      ) : (
+                        typeof row[col] === 'number' ? row[col].toFixed(2) : row[col]
+                      )}
+                    </TableCell>
+                  ))}
+                  {activeTab === 'visits' && (
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onViewVisitDetails(row.id);
+                        }}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  )}
+                </TableRow>
+              );
+              return rowContent;
+            })}
+          </TableBody>
+        </Table>
+      </div>
     </div>
-</div>
   );
 };
