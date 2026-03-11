@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { UserPlus, Search, Pencil, Route,Eye,ChevronLeft, ChevronRight,Users, UserCheck, UserCog, UserX  } from 'lucide-react';
+import { UserPlus, Search, Pencil, Route, Eye, ChevronLeft, ChevronRight, Users, UserCheck, UserCog, UserX, Activity } from 'lucide-react';
 import api from '@/services/api';
 import { useAuthContext } from '@/context/AuthContext';
 import { AddEditUserModal } from './AddEditUserModal';
@@ -27,7 +27,7 @@ export interface TeamMember {
   taRatePerKm: number;
   daAmount: number;
   managerId: number | null;
-    managerName: string | null;
+  managerName: string | null;
   // Nayi fields jo modal me hain, yahan bhi honi chahiye
   dateOfBirth: string | null;
   alternatePhone: string | null;
@@ -38,7 +38,7 @@ export interface TeamMember {
   bankName: string | null;
   bankBranch: string | null;
   ifscCode: string | null;
-    password: string; 
+  password: string;
 }
 export default function TeamManagementPage() {
   const { user } = useAuthContext();
@@ -48,9 +48,10 @@ export default function TeamManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<TeamMember | null>(null);
-   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewingUser, setViewingUser] = useState<TeamMember | null>(null);
-  const [activeTab, setActiveTab] = useState<'active' | 'deactivated'>('active');
+  const [activeTab, setActiveTab] = useState<'active' | 'deactivated' | 'working'>('active');
+  const [workingExecutiveIds, setWorkingExecutiveIds] = useState<Set<number>>(new Set());
   const fetchTeamMembers = async () => {
     try {
       setIsLoading(true);
@@ -62,16 +63,27 @@ export default function TeamManagementPage() {
       setIsLoading(false);
     }
   };
+  const fetchWorkingExecutives = async () => {
+    try {
+      const response = await api.get('/tracking/live');
+      const ids = new Set<number>(response.data.map((loc: any) => loc.salesExecutiveId));
+      setWorkingExecutiveIds(ids);
+    } catch (error) {
+      console.error('Failed to fetch working executives:', error);
+    }
+  };
+
   useEffect(() => {
     if (user) {
       fetchTeamMembers();
+      fetchWorkingExecutives();
     }
   }, [user]);
   const handleStatusToggle = async (userId: number, currentStatus: number) => {
     const newStatus = currentStatus === 1 ? 2 : 1;
     try {
-     // await api.patch(`/executives/${userId}/status`, newStatus, {
-         await api.post(`/executives/${userId}/status`, newStatus, {
+      // await api.patch(`/executives/${userId}/status`, newStatus, {
+      await api.post(`/executives/${userId}/status`, newStatus, {
 
         headers: { 'Content-Type': 'application/json' }
       });
@@ -88,7 +100,7 @@ export default function TeamManagementPage() {
     setEditingUser(member);
     setIsModalOpen(true);
   };
-   const handleOpenViewModal = (member: TeamMember) => {
+  const handleOpenViewModal = (member: TeamMember) => {
     setViewingUser(member);
     setIsViewModalOpen(true);
   };
@@ -123,21 +135,26 @@ export default function TeamManagementPage() {
     (member.assignedArea && member.assignedArea.toLowerCase().includes(searchTerm.toLowerCase())) ||
     member.mobileNumber.includes(searchTerm)
   );
- const teamCounts = useMemo(() => {
+  const teamCounts = useMemo(() => {
     return {
       total: teamMembers.length,
       asm: teamMembers.filter(m => m.roleName === 'ASM').length,
       executive: teamMembers.filter(m => m.roleName === 'Executive').length,
-        deactivated: teamMembers.filter(m => m.status === 2).length,
+      deactivated: teamMembers.filter(m => m.status === 2).length,
+      working: workingExecutiveIds.size,
     };
-  }, [teamMembers]);
-  const activeAndPendingMembers = useMemo(() => 
-    filteredMembers.filter(m => m.status === 1 || m.status === 0), 
+  }, [teamMembers, workingExecutiveIds]);
+  const activeAndPendingMembers = useMemo(() =>
+    filteredMembers.filter(m => m.status === 1 || m.status === 0),
     [filteredMembers]
   );
-  const deactivatedMembers = useMemo(() => 
-    filteredMembers.filter(m => m.status === 2), 
+  const deactivatedMembers = useMemo(() =>
+    filteredMembers.filter(m => m.status === 2),
     [filteredMembers]
+  );
+  const currentlyWorkingMembers = useMemo(() =>
+    filteredMembers.filter(m => workingExecutiveIds.has(m.id)),
+    [filteredMembers, workingExecutiveIds]
   );
   if (isLoading) return <div>Loading team members...</div>;
   return (
@@ -149,15 +166,15 @@ export default function TeamManagementPage() {
           Add New Member
         </Button>
       </div>
-<div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
         {/* Summary Cards */}
-<div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:col-span-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:col-span-3">
           <SummaryCard title="Total Members" count={teamCounts.total} icon={Users} color="text-blue-600" />
           <SummaryCard title="ASMs" count={teamCounts.asm} icon={UserCog} color="text-purple-600" />
           <SummaryCard title="Executives" count={teamCounts.executive} icon={UserCheck} color="text-green-600" />
-     <SummaryCard title="Deactivated" count={teamCounts.deactivated} icon={UserX} color="text-red-600" />
+          <SummaryCard title="Currently Working" count={teamCounts.working} icon={Activity} color="text-emerald-600" />
         </div>
-        
+
         {/* Search Bar */}
         <div className="relative lg:col-span-2">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -182,27 +199,34 @@ export default function TeamManagementPage() {
           </div>
         </CardContent>
       </Card> */}
-       <Card>
+      <Card>
         <CardHeader className="p-0">
           {/* --- NAYA CHANGE: Tabs UI add karein --- */}
           <div className="flex border-b">
             <button
               onClick={() => setActiveTab('active')}
-              className={`px-4 py-3 font-medium text-sm transition-colors ${
-                activeTab === 'active'
+              className={`px-4 py-3 font-medium text-sm transition-colors ${activeTab === 'active'
                   ? 'border-b-2 border-blue-600 text-blue-600'
                   : 'text-gray-500 hover:bg-gray-50'
-              }`}
+                }`}
             >
               Active & Pending ({activeAndPendingMembers.length})
             </button>
             <button
+              onClick={() => setActiveTab('working')}
+              className={`px-4 py-3 font-medium text-sm transition-colors ${activeTab === 'working'
+                  ? 'border-b-2 border-emerald-600 text-emerald-600'
+                  : 'text-gray-500 hover:bg-gray-50'
+                }`}
+            >
+              Currently Working ({currentlyWorkingMembers.length})
+            </button>
+            <button
               onClick={() => setActiveTab('deactivated')}
-              className={`px-4 py-3 font-medium text-sm transition-colors ${
-                activeTab === 'deactivated'
+              className={`px-4 py-3 font-medium text-sm transition-colors ${activeTab === 'deactivated'
                   ? 'border-b-2 border-red-600 text-red-600'
                   : 'text-gray-500 hover:bg-gray-50'
-              }`}
+                }`}
             >
               Deactivated ({deactivatedMembers.length})
             </button>
@@ -222,8 +246,7 @@ export default function TeamManagementPage() {
                 </tr>
               </thead>
               <tbody>
-                {/* --- NAYA CHANGE: Sahi list ko render karein --- */}
-                {(activeTab === 'active' ? activeAndPendingMembers : deactivatedMembers).map((member) => (
+                {(activeTab === 'active' ? activeAndPendingMembers : activeTab === 'working' ? currentlyWorkingMembers : deactivatedMembers).map((member) => (
                   <tr key={member.id} className="border-b hover:bg-gray-50">
                     <td className="p-3">
                       <div className="flex items-center space-x-3">
@@ -231,7 +254,15 @@ export default function TeamManagementPage() {
                           <AvatarFallback>{getInitials(member.name)}</AvatarFallback>
                         </Avatar>
                         <div>
-                          <p className="font-medium text-gray-900">{member.name}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-medium text-gray-900">{member.name}</p>
+                            {workingExecutiveIds.has(member.id) && (
+                              <span className="relative flex h-2.5 w-2.5" title="Currently Working">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                              </span>
+                            )}
+                          </div>
                           <p className="text-sm text-gray-600">@{member.username}</p>
                         </div>
                       </div>
@@ -257,7 +288,7 @@ export default function TeamManagementPage() {
                     </td>
                     <td className="p-3">
                       <div className="flex items-center space-x-1">
-                         <Button onClick={() => handleOpenViewModal(member)} variant="ghost" size="icon" className="h-8 w-8" title="View Details">
+                        <Button onClick={() => handleOpenViewModal(member)} variant="ghost" size="icon" className="h-8 w-8" title="View Details">
                           <Eye className="h-4 w-4 text-blue-600" />
                         </Button>
                         <Button onClick={() => handleOpenEditModal(member)} variant="ghost" size="icon" className="h-8 w-8" title="Edit User">
@@ -287,7 +318,7 @@ export default function TeamManagementPage() {
         onSuccess={handleSuccess}
         editingUser={editingUser}
         currentUserRole={user?.roleName || ''} />
-         <ViewUserModal
+      <ViewUserModal
         isOpen={isViewModalOpen}
         onClose={() => setIsViewModalOpen(false)}
         user={viewingUser}
@@ -307,4 +338,4 @@ function SummaryCard({ title, count, icon: Icon, color }: { title: string; count
       </CardContent>
     </Card>
   );
-  }
+}

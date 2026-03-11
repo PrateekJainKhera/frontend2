@@ -1,4 +1,5 @@
 'use client';
+import { Suspense } from 'react';
 import * as XLSX from 'xlsx';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +13,7 @@ import { Download, Search, Eye, BarChart2, Users, IndianRupee, Route } from 'luc
 import api from '@/services/api';
 import { DateRange } from 'react-day-picker';
 import { useAuthContext } from '@/context/AuthContext';
+import { useSearchParams } from 'next/navigation';
 import { Progress } from "@/components/ui/progress";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"; // <-- YEH IMPORT ADD KAREIN
 import { ChevronLeft, ChevronRight } from 'lucide-react'; // Naye icons import karein
@@ -86,8 +88,9 @@ const formatDateForApi = (date: Date): string => {
 };
 
 
-export default function ReportsPage() {
+function ReportsPageContent() {
   const { user: currentUser } = useAuthContext();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<ReportTab>('performance');
 
   const [executives, setExecutives] = useState<{ id: number; name: string }[]>([]);
@@ -115,12 +118,26 @@ export default function ReportsPage() {
   const [selectedLocationHistory, setSelectedLocationHistory] = useState<VisitHistoryItem[]>([]);
   const [selectedLocationName, setSelectedLocationName] = useState('');
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [workingExecutiveIds, setWorkingExecutiveIds] = useState<Set<number>>(new Set());
+  const [showOnlyActive, setShowOnlyActive] = useState(false);
 
   useEffect(() => {
     if (currentUser?.roleName === 'Admin') {
       api.get('/executives').then(res => setExecutives(res.data));
+      api.get('/tracking/live').then(res => {
+        const ids = new Set<number>(res.data.map((loc: any) => loc.salesExecutiveId));
+        setWorkingExecutiveIds(ids);
+      }).catch(err => console.error('Failed to fetch active executives:', err));
     }
   }, [currentUser]);
+
+  // Auto-select executive from URL query param (e.g., from live tracking page)
+  useEffect(() => {
+    const execIdFromUrl = searchParams.get('executiveId');
+    if (execIdFromUrl) {
+      setSelectedExecutiveId(execIdFromUrl);
+    }
+  }, [searchParams]);
   const fetchReports = useCallback(async (page = 1) => {
     if (!dateRange?.from || !dateRange?.to) { alert("Please select a valid date range."); return; }
     setIsLoading(true);
@@ -484,13 +501,34 @@ export default function ReportsPage() {
             </div>
           </div>
           {currentUser?.roleName === 'Admin' && (
-            <div className="grow min-w-[200px]">
-              <label className="text-sm font-medium">Executive</label>
+            <div className="grow min-w-[200px] space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Executive</label>
+                <Button
+                  variant={showOnlyActive ? 'default' : 'outline'}
+                  size="sm"
+                  className={`h-7 text-xs gap-1 ${showOnlyActive ? 'bg-emerald-600 hover:bg-emerald-700' : ''}`}
+                  onClick={() => setShowOnlyActive(!showOnlyActive)}
+                >
+                  <span className="relative flex h-2 w-2">
+                    <span className={`${showOnlyActive ? 'animate-ping' : ''} absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75`}></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  Active Only
+                </Button>
+              </div>
               <Select value={selectedExecutiveId} onValueChange={setSelectedExecutiveId}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Executives</SelectItem>
-                  {executives.map(exec => (<SelectItem key={exec.id} value={exec.id.toString()}>{exec.name}</SelectItem>))}
+                  <SelectItem value="all">{showOnlyActive ? 'All Active Executives' : 'All Executives'}</SelectItem>
+                  {executives
+                    .filter(exec => !showOnlyActive || workingExecutiveIds.has(exec.id))
+                    .map(exec => (
+                      <SelectItem key={exec.id} value={exec.id.toString()}>
+                        {workingExecutiveIds.has(exec.id) ? `🟢 ${exec.name}` : exec.name}
+                      </SelectItem>
+                    ))
+                  }
                 </SelectContent>
               </Select>
             </div>
@@ -675,6 +713,15 @@ export default function ReportsPage() {
       />
 
     </div>
+  );
+}
+
+// Wrap in Suspense for useSearchParams
+export default function ReportsPage() {
+  return (
+    <Suspense fallback={<div>Loading reports...</div>}>
+      <ReportsPageContent />
+    </Suspense>
   );
 }
 

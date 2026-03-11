@@ -1,15 +1,16 @@
 'use client';
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { APIProvider, Map, AdvancedMarker, InfoWindow,useMap } from '@vis.gl/react-google-maps';
+import { useRouter } from 'next/navigation';
+import { APIProvider, Map, AdvancedMarker, InfoWindow, useMap } from '@vis.gl/react-google-maps';
 import api from '@/services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { User, Clock, AlertTriangle, RefreshCw, MapPin, Search, MapIcon, List } from 'lucide-react'; // Import MapPin
+import { User, Clock, AlertTriangle, RefreshCw, MapPin, Search, MapIcon, List, BarChart2, Route } from 'lucide-react';
 import { TimeAgo } from '@/components/TimeAgo';
 import { useAuthContext } from '@/context/AuthContext';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input'; // 1. Import the Input component
+import { Input } from '@/components/ui/input';
 
 // 1. UPDATE: The interface now expects an 'address' string
 interface LiveLocation {
@@ -39,6 +40,7 @@ function MapUpdater({ center, zoom }: { center: { lat: number; lng: number }, zo
 
 export default function LiveTrackingPage() {
   const { user } = useAuthContext();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,12 +49,11 @@ export default function LiveTrackingPage() {
   const [zoomLevel, setZoomLevel] = useState(12);
   const [openInfoWindowId, setOpenInfoWindowId] = useState<number | null>(null);
   const [allLiveLocations, setAllLiveLocations] = useState<LiveLocation[]>([]);
-  //const [selectedTeam, setSelectedTeam] = useState('all');
-  
-  // --- 2. ADD NEW STATE FOR SEARCH ---
+  const [expandedExecutiveId, setExpandedExecutiveId] = useState<number | null>(null);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTeam, setSelectedTeam] = useState('all');
-    const [mobileView, setMobileView] = useState<'list' | 'map'>('list');
+  const [mobileView, setMobileView] = useState<'list' | 'map'>('list');
 
   const fetchLiveLocations = useCallback(async () => {
     setIsRefreshing(true);
@@ -80,25 +81,29 @@ export default function LiveTrackingPage() {
   //   }
   //   return allLiveLocations.filter(exec => exec.asmName === selectedTeam);
   // }, [selectedTeam, allLiveLocations]);
-const filteredLocations = useMemo(() => {
+  const filteredLocations = useMemo(() => {
     return allLiveLocations
       .filter(exec => {
         // Team Filter
         const teamMatch = selectedTeam === 'all' || exec.asmName === selectedTeam;
         if (!teamMatch) return false;
-        
+
         // Search Filter
-        const searchMatch = searchTerm.trim() === '' || 
-                            exec.executiveName.toLowerCase().includes(searchTerm.toLowerCase());
+        const searchMatch = searchTerm.trim() === '' ||
+          exec.executiveName.toLowerCase().includes(searchTerm.toLowerCase());
         return searchMatch;
       });
   }, [selectedTeam, allLiveLocations, searchTerm]); // Add searchTerm to dependencies
   const handleExecutiveSelect = (executive: LiveLocation) => {
+    // Toggle expand/collapse
+    const isAlreadyExpanded = expandedExecutiveId === executive.salesExecutiveId;
+    setExpandedExecutiveId(isAlreadyExpanded ? null : executive.salesExecutiveId);
+
+    // Always zoom and select on map
     setMapCenter({ lat: executive.latitude, lng: executive.longitude });
     setZoomLevel(15);
     setOpenInfoWindowId(executive.salesExecutiveId);
-        setMobileView('map');
-
+    setMobileView('map');
   };
 
   const asmTeams = useMemo(() =>
@@ -109,11 +114,11 @@ const filteredLocations = useMemo(() => {
   if (isLoading) {
     return <div>Loading live tracking data...</div>;
   }
-return (
+  return (
     <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!}>
       {/* Main container: flex-col on mobile, flex-row on large screens */}
       <div className="flex flex-col h-[calc(100vh-4rem)] lg:flex-row lg:gap-6">
-        
+
         {/* List Card: Visible on mobile if mobileView is 'list', always visible on desktop */}
         <Card className={`w-full lg:w-1/3 lg:max-w-sm flex flex-col ${mobileView === 'list' ? 'flex' : 'hidden'} lg:flex`}>
           <CardHeader>
@@ -128,11 +133,11 @@ return (
                 Last updated: <TimeAgo timestamp={lastUpdated.toISOString()} />
               </p>
             )}
-            
+
             <div className="pt-4 space-y-4">
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
-                <Input 
+                <Input
                   placeholder="Search by name..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -153,7 +158,7 @@ return (
               )}
             </div>
           </CardHeader>
-          
+
           <CardContent className="flex-1 overflow-y-auto">
             {error && (
               <div className="p-3 mb-4 text-sm text-red-700 bg-red-100 rounded-lg flex items-start">
@@ -171,9 +176,8 @@ return (
                 filteredLocations.map((exec, index) => (
                   <div
                     key={`${exec.salesExecutiveId}-${index}`}
-                    className={`p-3 rounded-lg cursor-pointer border ${
-                      openInfoWindowId === exec.salesExecutiveId ? 'bg-blue-100 border-blue-300' : 'hover:bg-gray-50'
-                    }`}
+                    className={`p-3 rounded-lg cursor-pointer border transition-all duration-200 ${openInfoWindowId === exec.salesExecutiveId ? 'bg-blue-50 border-blue-300' : 'hover:bg-gray-50'
+                      }`}
                     onClick={() => handleExecutiveSelect(exec)}
                   >
                     <div className="flex justify-between items-center">
@@ -187,15 +191,41 @@ return (
                       <MapPin className="h-4 w-4 mr-2 shrink-0 mt-0.5" />
                       <span>{exec.address}</span>
                     </p>
+                    {/* Expandable Action Buttons */}
+                    {expandedExecutiveId === exec.salesExecutiveId && (
+                      <div
+                        className="flex gap-2 mt-3 pt-3 border-t"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50"
+                          onClick={() => router.push(`/dashboard/reports?executiveId=${exec.salesExecutiveId}`)}
+                        >
+                          <BarChart2 className="h-4 w-4" />
+                          View Report
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 gap-1.5 text-green-600 border-green-200 hover:bg-green-50"
+                          onClick={() => router.push(`/dashboard/team/${exec.salesExecutiveId}/route-replay`)}
+                        >
+                          <Route className="h-4 w-4" />
+                          Route Replay
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
             </div>
           </CardContent>
         </Card>
-        
+
         {/* Map Container: Visible on mobile if mobileView is 'map', always visible on desktop */}
- <div className={`flex-1 h-full w-full ${mobileView === 'map' ? 'block' : 'hidden'} lg:block`}>
+        <div className={`flex-1 h-full w-full ${mobileView === 'map' ? 'block' : 'hidden'} lg:block`}>
           <Map
             defaultCenter={{ lat: 22.7196, lng: 75.8577 }} // Changed to defaultCenter
             defaultZoom={12}                               // Changed to defaultZoom
@@ -219,7 +249,7 @@ return (
                 </div>
               </AdvancedMarker>
             ))}
-            
+
             {openInfoWindowId !== null && (() => {
               const executive = filteredLocations.find(e => e.salesExecutiveId === openInfoWindowId);
               if (!executive) return null;
@@ -244,15 +274,15 @@ return (
 
         {/* Mobile View Toggle Buttons: Only visible on small screens */}
         <div className="lg:hidden fixed bottom-4 right-4 z-20 flex flex-col gap-2">
-          <Button 
-            size="icon" 
+          <Button
+            size="icon"
             className={`h-14 w-14 rounded-full shadow-lg transition-colors ${mobileView === 'list' ? 'bg-blue-600 text-white' : 'bg-white text-gray-800'}`}
             onClick={() => setMobileView('list')}
           >
             <List className="h-6 w-6" />
           </Button>
-          <Button 
-            size="icon" 
+          <Button
+            size="icon"
             className={`h-14 w-14 rounded-full shadow-lg transition-colors ${mobileView === 'map' ? 'bg-blue-600 text-white' : 'bg-white text-gray-800'}`}
             onClick={() => setMobileView('map')}
           >
