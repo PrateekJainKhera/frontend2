@@ -8,9 +8,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { AddBookModal } from './AddBookModal';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
-} from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/combobox';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Badge } from '@/components/ui/badge';
 import { Send, Package, PlusCircle, Trash2, PackagePlus, Upload } from 'lucide-react';
@@ -127,7 +125,7 @@ export function SendNewConsignmentModal({ isOpen, onClose, onSuccess }: { isOpen
               <div className="space-y-2"><Label>Transport Company</Label><Input value={transport} onChange={(e) => setTransport(e.target.value)} /></div>
               <div className="space-y-2"><Label>Bilty Number</Label><Input value={biltyNo} onChange={(e) => setBiltyNo(e.target.value)} /></div>
               <div className="space-y-2"><Label>Dispatch Date</Label><DatePicker date={dispatchDate} onSelect={setDispatchDate} /></div>
-              <div className="space-y-2"><Label>Assign to Salesman</Label><Select value={salesmanId} onValueChange={setSalesmanId}><SelectTrigger><SelectValue placeholder="Select salesman" /></SelectTrigger><SelectContent>{salesmen.map(s => <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>)}</SelectContent></Select></div>
+              <div className="space-y-2"><Label>Assign to Salesman</Label><SearchableSelect value={salesmanId} onValueChange={setSalesmanId} placeholder="Select salesman" searchPlaceholder="Search salesman..." options={salesmen.map(s => ({ value: s.id.toString(), label: s.name }))} /></div>
             </div>
             <div className="space-y-2">
               <Label>Upload Bilty Bill (Optional)</Label>

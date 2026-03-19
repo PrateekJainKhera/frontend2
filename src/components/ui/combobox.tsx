@@ -2,84 +2,125 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronsUpDown } from "lucide-react"
-
+import { Check, ChevronsUpDown, Search } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
-// This is a generic Combobox component that can be reused.
-// We will need to adapt our MapSearch component to use this structure.
-// For now, just creating this file will solve the build errors.
+export interface ComboboxOption {
+  value: string
+  label: string
+}
 
-// Example usage (for reference, not to be used directly in MapSearch yet):
-const frameworks = [
-  { value: "next.js", label: "Next.js" },
-  { value: "sveltekit", label: "SvelteKit" },
-  { value: "nuxt.js", label: "Nuxt.js" },
-  { value: "remix", label: "Remix" },
-  { value: "astro", label: "Astro" },
-]
+interface SearchableSelectProps {
+  value: string
+  onValueChange: (value: string) => void
+  options: ComboboxOption[]
+  placeholder?: string
+  searchPlaceholder?: string
+  emptyText?: string
+  className?: string
+}
 
-export function ComboboxDemo() {
+export function SearchableSelect({
+  value,
+  onValueChange,
+  options,
+  placeholder = "Select...",
+  searchPlaceholder = "Search...",
+  emptyText = "No results found.",
+  className,
+}: SearchableSelectProps) {
   const [open, setOpen] = React.useState(false)
-  const [value, setValue] = React.useState("")
+  const [search, setSearch] = React.useState("")
+
+  const selectedLabel = options.find((o) => o.value === value)?.label
+
+  const filtered = search.trim()
+    ? options.filter((o) => o.label.toLowerCase().includes(search.toLowerCase()))
+    : options
+
+  function handleSelect(optionValue: string) {
+    onValueChange(optionValue)
+    setOpen(false)
+    setSearch("")
+  }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setSearch("") }}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-[200px] justify-between"
+          className={cn("w-full justify-between font-normal", className)}
         >
-          {value
-            ? frameworks.find((framework) => framework.value === value)?.label
-            : "Select framework..."}
+          <span className="truncate">{selectedLabel ?? placeholder}</span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[200px] p-0">
-        <Command>
-          <CommandInput placeholder="Search framework..." />
-          <CommandEmpty>No framework found.</CommandEmpty>
-          <CommandGroup>
-            <CommandList>
-              {frameworks.map((framework) => (
-                <CommandItem
-                  key={framework.value}
-                  value={framework.value}
-                  onSelect={(currentValue) => {
-                    setValue(currentValue === value ? "" : currentValue)
-                    setOpen(false)
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      value === framework.value ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  {framework.label}
-                </CommandItem>
-              ))}
-            </CommandList>
-          </CommandGroup>
-        </Command>
+      <PopoverContent
+        className="w-[var(--radix-popover-trigger-width)] p-0"
+        align="start"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        {/* Search input */}
+        <div className="flex items-center border-b px-3">
+          <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+          <input
+            className="flex h-10 w-full bg-transparent py-3 text-sm outline-none placeholder:text-gray-400"
+            placeholder={searchPlaceholder}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        {/* Options list */}
+        <div className="max-h-60 overflow-y-auto p-1">
+          {filtered.length === 0 ? (
+            <div className="py-6 text-center text-sm text-gray-500">{emptyText}</div>
+          ) : (
+            filtered.map((option) => (
+              <div
+                key={option.value}
+                role="option"
+                aria-selected={value === option.value}
+                className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm hover:bg-gray-100 hover:text-gray-900"
+                onClick={() => handleSelect(option.value)}
+              >
+                <Check
+                  className={cn(
+                    "mr-2 h-4 w-4 shrink-0",
+                    value === option.value ? "opacity-100" : "opacity-0"
+                  )}
+                />
+                {option.label}
+              </div>
+            ))
+          )}
+        </div>
       </PopoverContent>
     </Popover>
+  )
+}
+
+// Demo kept for reference
+export function ComboboxDemo() {
+  const [value, setValue] = React.useState("")
+  const options: ComboboxOption[] = [
+    { value: "next.js", label: "Next.js" },
+    { value: "sveltekit", label: "SvelteKit" },
+    { value: "nuxt.js", label: "Nuxt.js" },
+    { value: "remix", label: "Remix" },
+    { value: "astro", label: "Astro" },
+  ]
+  return (
+    <SearchableSelect
+      value={value}
+      onValueChange={setValue}
+      options={options}
+      placeholder="Select framework..."
+      searchPlaceholder="Search framework..."
+    />
   )
 }

@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/combobox';
 import { DatePickerWithRange } from '@/components/ui/date-range-picker';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -23,9 +23,11 @@ import { ToggleLeft, ToggleRight } from 'lucide-react';
 
 // Interfaces 
 interface PerformanceSummary {
-  executiveId: number; executiveName: string; roleName: string; totalVisits: number; plannedVisits: number; totalDistanceKm: number; totalExpenses: number; booksDistributed: number; totalTA: number;
-  totalDA: number;
-  otherExpenses: number;
+  executiveId: number; executiveName: string; roleName: string;
+  plannedVisits: number; totalVisits: number;
+  schoolVisits: number; coachingVisits: number; shopVisits: number;
+  totalDistanceKm: number; totalExpenses: number; booksDistributed: number;
+  totalTA: number; totalDA: number; otherExpenses: number;
 }
 
 interface DetailedVisit { id: number; visitDate: string; executiveName: string; locationName: string; locationType: string; area: string; principalRemarks: string | null; locationVisitCount: number; }
@@ -309,20 +311,22 @@ function ReportsPageContent() {
       const data = response.data;
       if (!data || data.length === 0) { alert("No data found for the selected range."); return; }
 
-      // Map API data to readable Excel columns
+      // Map API data to readable Excel columns (one row per visit)
       const excelData = data.map((row: any) => ({
         'Executive': row.executive,
         'Role': row.role,
         'Date': row.date,
-        'Start Day': row.startDay,
-        'End Day': row.endDay,
+        'Day Start': row.dayStart,
+        'Day End': row.dayEnd,
         'Distance (KM)': row.distanceKm,
-        'Visits': row.visits,
-        'Location Names': row.locationNames,
-        'Type': row.type,
+        'Total Visits (Day)': row.totalVisitsInDay,
+        'Visit No': row.visitNo,
+        'Visit Time': row.visitTime,
+        'Location Name': row.locationName,
+        'Type': row.locationType,
         'Area': row.area,
-        'Total Visits': row.totalVisitsPerLocation,
-        'Last Visit': row.lastVisitPerLocation,
+        'All-Time Visits to Location': row.allTimeVisitsToLocation,
+        'Last Visit Date': row.lastVisitDate,
         'Total TA (₹)': row.totalTA,
         'Total DA (₹)': row.totalDA,
         'Other Exp (₹)': row.otherExp,
@@ -330,7 +334,7 @@ function ReportsPageContent() {
         'Books Given': row.booksGiven,
         'Book Title': row.bookTitles,
         'Teacher Name': row.teacherNames,
-        'Quantity': row.quantity,
+        'Quantity': row.quantities,
       }));
 
       // Create Excel workbook
@@ -517,20 +521,20 @@ function ReportsPageContent() {
                   Active Only
                 </Button>
               </div>
-              <Select value={selectedExecutiveId} onValueChange={setSelectedExecutiveId}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{showOnlyActive ? 'All Active Executives' : 'All Executives'}</SelectItem>
-                  {executives
+              <SearchableSelect
+                value={selectedExecutiveId}
+                onValueChange={setSelectedExecutiveId}
+                searchPlaceholder="Search executive..."
+                options={[
+                  { value: 'all', label: showOnlyActive ? 'All Active Executives' : 'All Executives' },
+                  ...executives
                     .filter(exec => !showOnlyActive || workingExecutiveIds.has(exec.id))
-                    .map(exec => (
-                      <SelectItem key={exec.id} value={exec.id.toString()}>
-                        {workingExecutiveIds.has(exec.id) ? `🟢 ${exec.name}` : exec.name}
-                      </SelectItem>
-                    ))
-                  }
-                </SelectContent>
-              </Select>
+                    .map(exec => ({
+                      value: exec.id.toString(),
+                      label: workingExecutiveIds.has(exec.id) ? `🟢 ${exec.name}` : exec.name,
+                    }))
+                ]}
+              />
             </div>
           )}
           <Button
@@ -874,8 +878,10 @@ const PerformanceTable = ({ data, onFocus, onExport }: { data: PerformanceSummar
             <TableHead>Role</TableHead>
             <TableHead className="text-right">Planned Visits</TableHead>
             <TableHead className="text-right">Visits</TableHead>
+            <TableHead className="text-right">School Visits</TableHead>
+            <TableHead className="text-right">Coaching Visits</TableHead>
+            <TableHead className="text-right">Shop Visits</TableHead>
             <TableHead className="text-right">Distance (KM)</TableHead>
-            {/* Naye Columns */}
             <TableHead className="text-right">Total TA (₹)</TableHead>
             <TableHead className="text-right">Total DA (₹)</TableHead>
             <TableHead className="text-right">Other Exp (₹)</TableHead>
@@ -896,6 +902,9 @@ const PerformanceTable = ({ data, onFocus, onExport }: { data: PerformanceSummar
                 <TableCell>{item.roleName}</TableCell>
                 <TableCell className="text-right">{item.plannedVisits}</TableCell>
                 <TableCell className="text-right">{item.totalVisits}</TableCell>
+                <TableCell className="text-right">{item.schoolVisits}</TableCell>
+                <TableCell className="text-right">{item.coachingVisits}</TableCell>
+                <TableCell className="text-right">{item.shopVisits}</TableCell>
                 <TableCell className="text-right">{item.totalDistanceKm.toFixed(2)}</TableCell>
                 <TableCell className="text-right">{item.totalTA.toFixed(2)}</TableCell>
                 <TableCell className="text-right">{item.totalDA.toFixed(2)}</TableCell>

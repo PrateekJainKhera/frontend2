@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/combobox';
 import { Switch } from '@/components/ui/switch';
 import { UploadCloud, Download } from 'lucide-react';
 import api from '@/services/api';
@@ -159,22 +159,28 @@ export default function BulkAssignPage() {
 
           <div className="space-y-2">
             <Label>1. Select Executive</Label>
-            <Select value={selectedExecutiveId} onValueChange={setSelectedExecutiveId}>
-              <SelectTrigger><SelectValue placeholder="Select an executive..." /></SelectTrigger>
-              <SelectContent>{executives.map(e => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)}</SelectContent>
-            </Select>
+            <SearchableSelect
+              value={selectedExecutiveId}
+              onValueChange={setSelectedExecutiveId}
+              placeholder="Select an executive..."
+              searchPlaceholder="Search executive..."
+              options={executives.map(e => ({ value: e.id.toString(), label: e.name }))}
+            />
           </div>
 
           <div className="space-y-2">
             <Label>2. What type of locations are in this file?</Label>
-            <Select value={locationType} onValueChange={setLocationType}>
-              <SelectTrigger><SelectValue placeholder="Select a location type..." /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="0">School</SelectItem>
-                <SelectItem value="1">Coaching Center</SelectItem>
-                <SelectItem value="2">Shopkeeper</SelectItem>
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={locationType}
+              onValueChange={setLocationType}
+              placeholder="Select a location type..."
+              searchPlaceholder="Search type..."
+              options={[
+                { value: '0', label: 'School' },
+                { value: '1', label: 'Coaching Center' },
+                { value: '2', label: 'Shopkeeper' },
+              ]}
+            />
           </div>
 
           <div className="space-y-2">

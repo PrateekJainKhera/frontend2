@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/combobox';
 import { ShoppingCart, User, Hash, FilterX, ChevronLeft, ChevronRight } from 'lucide-react';
 import api from '@/services/api';
 import { useAuthContext } from '@/context/AuthContext';
@@ -117,13 +117,16 @@ const filteredOrders = useMemo(() => {
       <Card>
         <CardHeader><CardTitle>Filters</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2 items-end">
-          <Select value={topFilters.executive} onValueChange={(value) => setTopFilters(p => ({ ...p, executive: value === 'all' ? '' : value }))}>
-            <SelectTrigger><SelectValue placeholder="Select Executive" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Executives</SelectItem>
-              {executiveOptions.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            value={topFilters.executive === '' ? 'all' : topFilters.executive}
+            onValueChange={(value) => setTopFilters(p => ({ ...p, executive: value === 'all' ? '' : value }))}
+            placeholder="Select Executive"
+            searchPlaceholder="Search executive..."
+            options={[
+              { value: 'all', label: 'All Executives' },
+              ...executiveOptions.map(name => ({ value: name, label: name }))
+            ]}
+          />
           <Input placeholder="Search by Location (School)..." value={topFilters.location} onChange={(e) => setTopFilters(p => ({ ...p, location: e.target.value }))} />
           <DatePicker date={topFilters.dateFrom} onSelect={(date) => setTopFilters(p => ({ ...p, dateFrom: date }))} placeholder="Start Date" />
           <DatePicker date={topFilters.dateTo} onSelect={(date) => setTopFilters(p => ({ ...p, dateTo: date }))} placeholder="End Date" />

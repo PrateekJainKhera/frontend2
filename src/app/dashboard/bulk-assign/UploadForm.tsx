@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/combobox';
 import { UploadCloud, FileSpreadsheet } from 'lucide-react';
 import api from '@/services/api';
 
@@ -50,10 +50,13 @@ export function UploadForm({ onUpload, isLoading, uploadType }: UploadFormProps)
     <div className="space-y-4">
       <div className="space-y-2">
         <Label>1. Select Executive</Label>
-        <Select value={selectedExecutiveId} onValueChange={setSelectedExecutiveId}>
-          <SelectTrigger><SelectValue placeholder="Select an executive..." /></SelectTrigger>
-          <SelectContent>{executives.map(e => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)}</SelectContent>
-        </Select>
+        <SearchableSelect
+          value={selectedExecutiveId}
+          onValueChange={setSelectedExecutiveId}
+          placeholder="Select an executive..."
+          searchPlaceholder="Search executive..."
+          options={executives.map(e => ({ value: e.id.toString(), label: e.name }))}
+        />
       </div>
       <div className="space-y-2">
         <Label htmlFor={`file-${uploadType}`}>2. Select {uploadType} Excel File</Label>

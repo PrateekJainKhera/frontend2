@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/combobox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { FilterX, Download, Search, Users, MapPin, CheckCircle, Clock, School, GraduationCap, Store } from 'lucide-react';
 import api from '@/services/api';
@@ -243,28 +243,32 @@ export default function ViewAssignmentsPage() {
 
             <div className="space-y-2">
               <Label>Executive</Label>
-              <Select value={filters.executiveId} onValueChange={(v) => handleFilterChange('executiveId', v)}>
-                <SelectTrigger><SelectValue placeholder="All Executives" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Executives</SelectItem>
-                  {executives.map(e => (
-                    <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={filters.executiveId}
+                onValueChange={(v) => handleFilterChange('executiveId', v)}
+                placeholder="All Executives"
+                searchPlaceholder="Search executive..."
+                options={[
+                  { value: 'all', label: 'All Executives' },
+                  ...executives.map(e => ({ value: e.id.toString(), label: e.name }))
+                ]}
+              />
             </div>
 
             <div className="space-y-2">
               <Label>Location Type</Label>
-              <Select value={filters.locationType} onValueChange={(v) => handleFilterChange('locationType', v)}>
-                <SelectTrigger><SelectValue placeholder="All Types" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="0">Schools</SelectItem>
-                  <SelectItem value="1">Coaching Centers</SelectItem>
-                  <SelectItem value="2">Shopkeepers</SelectItem>
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={filters.locationType}
+                onValueChange={(v) => handleFilterChange('locationType', v)}
+                placeholder="All Types"
+                searchPlaceholder="Search type..."
+                options={[
+                  { value: 'all', label: 'All Types' },
+                  { value: '0', label: 'Schools' },
+                  { value: '1', label: 'Coaching Centers' },
+                  { value: '2', label: 'Shopkeepers' },
+                ]}
+              />
             </div>
 
             <div className="flex items-end gap-2 md:col-span-2">

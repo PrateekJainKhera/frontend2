@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/combobox';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Upload, Send, AlertTriangle, CheckCircle } from 'lucide-react';
 import api from '@/services/api';
@@ -173,10 +173,13 @@ return (
               </div>
               <div className="space-y-2">
                 <Label>Assign to Salesman</Label>
-                <Select value={salesExecutiveId} onValueChange={setSalesExecutiveId}>
-                  <SelectTrigger><SelectValue placeholder="Select salesman" /></SelectTrigger>
-                  <SelectContent>{salesmen.map(s => <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>)}</SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={salesExecutiveId}
+                  onValueChange={setSalesExecutiveId}
+                  placeholder="Select salesman"
+                  searchPlaceholder="Search salesman..."
+                  options={salesmen.map(s => ({ value: s.id.toString(), label: s.name }))}
+                />
               </div>
             </div>
             <div className="space-y-2">
