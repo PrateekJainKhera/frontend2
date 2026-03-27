@@ -25,7 +25,7 @@ import { ToggleLeft, ToggleRight } from 'lucide-react';
 interface PerformanceSummary {
   executiveId: number; executiveName: string; roleName: string;
   plannedVisits: number; totalVisits: number;
-  schoolVisits: number; coachingVisits: number; shopVisits: number;
+  schoolVisits: number; coachingVisits: number; shopVisits: number; revisitCount: number;
   totalDistanceKm: number; totalExpenses: number; booksDistributed: number;
   totalTA: number; totalDA: number; otherExpenses: number;
 }
@@ -239,7 +239,7 @@ function ReportsPageContent() {
       const response = await api.post('/reports/bulk-visit-details', visitIds);
       const detailedVisits: VisitDetailReport[] = response.data;
 
-      // 3. Data ko CSV ke liye flat karein
+      // 3. Data ko Excel ke liye flat karein
       const flatData: any[] = [];
       detailedVisits.forEach(visit => {
         // Har visit ke liye ek base object banayein
@@ -286,7 +286,7 @@ function ReportsPageContent() {
         }
       });
 
-      // 4. CSV generate karein
+      // 4. Excel generate karein
       exportToCsv('detailed_visit_report', flatData);
 
     } catch (error) {
@@ -405,40 +405,10 @@ function ReportsPageContent() {
       alert("No data to export.");
       return;
     }
-    const headers = Object.keys(data[0]);
-    // Ye function har value ko CSV ke liye safe banayega
-    const formatValue = (value: any): string => {
-      if (value === null || value === undefined) {
-        return ''; // null ya undefined ko khaali chhod dein
-      }
-
-      let stringValue = String(value);
-      // Agar value me comma, double-quote, ya newline hai, toh usko quotes me daalein
-      if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
-        // Har double-quote ko do double-quotes se replace karein
-        stringValue = stringValue.replace(/"/g, '""');
-        return `"${stringValue}"`;
-      }
-      return stringValue;
-    };
-    const csvContent = [
-      headers.join(','), // Header row
-      ...data.map(row =>
-        headers.map(header => formatValue(row[header])).join(',')
-      ) // Data rows
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    if (link.download !== undefined) {
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `${filename}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+    XLSX.writeFile(workbook, `${filename}.xlsx`);
   };
   function getExpenseTypeText(type: number) { return type === 1 ? "DA" : type === 0 ? "TA" : "Other"; }
   function getStatusText(status: number) { return status === 1 ? "Approved" : status === 2 ? "Rejected" : "Pending"; }
@@ -881,6 +851,7 @@ const PerformanceTable = ({ data, onFocus, onExport }: { data: PerformanceSummar
             <TableHead className="text-right">School Visits</TableHead>
             <TableHead className="text-right">Coaching Visits</TableHead>
             <TableHead className="text-right">Shop Visits</TableHead>
+            <TableHead className="text-right">Re-visits</TableHead>
             <TableHead className="text-right">Distance (KM)</TableHead>
             <TableHead className="text-right">Total TA (₹)</TableHead>
             <TableHead className="text-right">Total DA (₹)</TableHead>
@@ -905,6 +876,7 @@ const PerformanceTable = ({ data, onFocus, onExport }: { data: PerformanceSummar
                 <TableCell className="text-right">{item.schoolVisits}</TableCell>
                 <TableCell className="text-right">{item.coachingVisits}</TableCell>
                 <TableCell className="text-right">{item.shopVisits}</TableCell>
+                <TableCell className="text-right">{item.revisitCount}</TableCell>
                 <TableCell className="text-right">{item.totalDistanceKm.toFixed(2)}</TableCell>
                 <TableCell className="text-right">{item.totalTA.toFixed(2)}</TableCell>
                 <TableCell className="text-right">{item.totalDA.toFixed(2)}</TableCell>

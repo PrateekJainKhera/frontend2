@@ -8,8 +8,9 @@ import { MapPin, User, Calendar, Camera, MessageSquare, Users, BookOpen, Shoppin
 import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { useState } from 'react';
 
-// Image base URL (hosted on ngrok/Linux server, different from API base URL)
-const IMAGE_BASE_URL = 'https://gph.indusanalytics.co.in';
+const IMAGE_BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '');
+const getPhotoUrl = (url: string) =>
+  url.startsWith('http') ? url : `${IMAGE_BASE_URL}/${url.replace(/\\/g, '/')}`;
 // Backend ke DTO se match karta hua TypeScript interface
 interface VisitDetailReport {
   visitId: number;
@@ -96,7 +97,7 @@ export function VisitDetailModal({ isOpen, onClose, visitData, isLoading }: Visi
                           className="relative w-full aspect-square rounded-md overflow-hidden cursor-pointer group border"
                         >
                           <img
-                            src={`${IMAGE_BASE_URL}/${visitData.checkInPhotoUrl.replace(/\\/g, '/')}`}
+                            src={getPhotoUrl(visitData.checkInPhotoUrl)}
                             alt="Check-in thumbnail"
                             className="w-full h-full object-cover"
                           />
@@ -196,13 +197,13 @@ export function VisitDetailModal({ isOpen, onClose, visitData, isLoading }: Visi
           </DialogHeader>
           {/* === END FIX === */}
           <a
-            href={visitData?.checkInPhotoUrl ? `${IMAGE_BASE_URL}/${visitData.checkInPhotoUrl.replace(/\\/g, '/')}` : '#'}
+            href={visitData?.checkInPhotoUrl ? getPhotoUrl(visitData.checkInPhotoUrl) : '#'}
             target="_blank"
             rel="noopener noreferrer"
             title="Open image in new tab to zoom"
           >
             <img
-              src={visitData?.checkInPhotoUrl ? `${IMAGE_BASE_URL}/${visitData.checkInPhotoUrl.replace(/\\/g, '/')}` : ''}
+              src={visitData?.checkInPhotoUrl ? getPhotoUrl(visitData.checkInPhotoUrl) : ''}
               alt="Check-in full preview"
               className="w-full h-auto rounded-md"
             />
