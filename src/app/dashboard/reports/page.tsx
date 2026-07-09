@@ -95,7 +95,8 @@ function ReportsPageContent() {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<ReportTab>('performance');
 
-  const [executives, setExecutives] = useState<{ id: number; name: string }[]>([]);
+  const [executives, setExecutives] = useState<{ id: number; name: string; status: number }[]>([]);
+  // status: 0 = PendingApproval, 1 = Active, 2 = Deactivated
   const [selectedExecutiveId, setSelectedExecutiveId] = useState<string>('all');
   const getDateMinusDays = (days: number) => { const date = new Date(); date.setDate(date.getDate() - days); return date; };
   const [dateRange, setDateRange] = useState<DateRange | undefined>({ from: getDateMinusDays(6), to: new Date() });
@@ -116,6 +117,7 @@ function ReportsPageContent() {
   const [isModalLoading, setIsModalLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isExtractingComplete, setIsExtractingComplete] = useState(false);
+  const [isExtractingRiderSummary, setIsExtractingRiderSummary] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [selectedLocationHistory, setSelectedLocationHistory] = useState<VisitHistoryItem[]>([]);
   const [selectedLocationName, setSelectedLocationName] = useState('');
@@ -367,6 +369,81 @@ function ReportsPageContent() {
 
 
 
+  const extractRiderSummary = async () => {
+    if (!dateRange?.from || !dateRange?.to) { alert("Please select a date range first."); return; }
+    if (filteredPerformanceData.length === 0) { alert("Please click 'Generate Report' first to load data."); return; }
+
+    setIsExtractingRiderSummary(true);
+    try {
+      const totalDays = Math.round(
+        (dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24)
+      ) + 1;
+      const dateRangeStr = `${formatDateForApi(dateRange.from)} to ${formatDateForApi(dateRange.to)}`;
+
+      // Fetch per-km TA rate for each executive
+      const execRes = await api.get('/executives');
+      const execRateMap: Record<number, number> = {};
+      execRes.data.forEach((e: any) => {
+        execRateMap[e.id] = e.taRatePerKm ?? 2;
+      });
+
+      // Fetch all workday records in one shot to count working days per executive
+      const workdayRes = await api.get('/reports/workday-summary', {
+        params: {
+          startDate: formatDateForApi(dateRange.from),
+          endDate: formatDateForApi(dateRange.to),
+          executiveId: selectedExecutiveId === 'all' ? undefined : parseInt(selectedExecutiveId),
+          pageNumber: 1,
+          pageSize: 10000,
+        },
+      });
+      const allWorkdays: { name: string; date: string }[] = workdayRes.data.items;
+
+      // Count working days per executive name
+      const workingDaysMap: Record<string, number> = {};
+      allWorkdays.forEach(wd => {
+        workingDaysMap[wd.name] = (workingDaysMap[wd.name] || 0) + 1;
+      });
+
+      const excelData = filteredPerformanceData.map(exec => {
+        const ratePerKm = execRateMap[exec.executiveId] ?? 2;
+        const calculatedTA = exec.totalDistanceKm * ratePerKm;
+        const totalAmount = calculatedTA + exec.totalDA + exec.otherExpenses;
+        return {
+          'Name': exec.executiveName,
+          'Date Range': dateRangeStr,
+          'Total Days': totalDays,
+          'Working Days': workingDaysMap[exec.executiveName] || 0,
+          'Total Visits': exec.totalVisits,
+          'Total KM': exec.totalDistanceKm.toFixed(2),
+          'TA Rate (Rs/km)': ratePerKm.toFixed(2),
+          'Total TA (Rs)': calculatedTA.toFixed(2),
+          'Total DA (Rs)': exec.totalDA.toFixed(2),
+          'Total Other Expenses (Rs)': exec.otherExpenses.toFixed(2),
+          'Total Amount (Rs)': totalAmount.toFixed(2),
+        };
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      const colWidths = Object.keys(excelData[0]).map(key => {
+        const maxLen = Math.max(key.length, ...excelData.map(row => String(row[key as keyof typeof row] ?? '').length));
+        return { wch: Math.min(maxLen + 2, 40) };
+      });
+      worksheet['!cols'] = colWidths;
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Rider Summary');
+      const fromStr = formatDateForApi(dateRange.from).replace(/-/g, '');
+      const toStr = formatDateForApi(dateRange.to).replace(/-/g, '');
+      XLSX.writeFile(workbook, `Rider_Summary_${fromStr}_to_${toStr}.xlsx`);
+    } catch (error) {
+      console.error("Failed to extract rider summary:", error);
+      alert("Failed to extract rider summary.");
+    } finally {
+      setIsExtractingRiderSummary(false);
+    }
+  };
+
   // Jab bhi executive ya date range badle, ye chalega
   // --- NAYA FEATURE #1: Executive 360° View ---
   const handleExecutiveFocus = (execId: number) => {
@@ -412,18 +489,28 @@ function ReportsPageContent() {
   };
   function getExpenseTypeText(type: number) { return type === 1 ? "DA" : type === 0 ? "TA" : "Other"; }
   function getStatusText(status: number) { return status === 1 ? "Approved" : status === 2 ? "Rejected" : "Pending"; }
+  // Active executive IDs from the executives list (status === 1 means Active)
+  const activeExecutiveIds = useMemo(() =>
+    new Set(executives.filter(e => e.status === 1).map(e => e.id)),
+    [executives]
+  );
+
+  // When "All Executives" selected, show only Active ones in performance report
+  const filteredPerformanceData = useMemo(() => {
+    if (selectedExecutiveId !== 'all' || executives.length === 0) return performanceData;
+    return performanceData.filter(p => activeExecutiveIds.has(p.executiveId));
+  }, [performanceData, selectedExecutiveId, activeExecutiveIds, executives]);
+
   const kpiData = useMemo(() => {
-    if (performanceData.length === 0) {
+    if (filteredPerformanceData.length === 0) {
       return { totalVisits: 0, totalExpenses: 0, totalDistance: 0, activeExecutives: 0 };
     }
-
-    const totalVisits = performanceData.reduce((sum, item) => sum + item.totalVisits, 0);
-    const totalExpenses = performanceData.reduce((sum, item) => sum + item.totalExpenses, 0);
-    const totalDistance = performanceData.reduce((sum, item) => sum + item.totalDistanceKm, 0);
-    // Active executives ka count unique IDs se nikalenge
-    const activeExecutives = new Set(performanceData.map(item => item.executiveId)).size;
+    const totalVisits = filteredPerformanceData.reduce((sum, item) => sum + item.totalVisits, 0);
+    const totalExpenses = filteredPerformanceData.reduce((sum, item) => sum + item.totalExpenses, 0);
+    const totalDistance = filteredPerformanceData.reduce((sum, item) => sum + item.totalDistanceKm, 0);
+    const activeExecutives = new Set(filteredPerformanceData.map(item => item.executiveId)).size;
     return { totalVisits, totalExpenses, totalDistance, activeExecutives };
-  }, [performanceData]);
+  }, [filteredPerformanceData]);
 
   // Client-side pagination for each report type
   const paginatedVisitData = useMemo(() => {
@@ -523,6 +610,15 @@ function ReportsPageContent() {
             <Download className="h-4 w-4 mr-2" />
             {isExtractingComplete ? 'Extracting...' : 'Extract Complete Report'}
           </Button>
+          <Button
+            onClick={extractRiderSummary}
+            disabled={isExtractingRiderSummary}
+            variant="outline"
+            className="w-full sm:w-auto"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            {isExtractingRiderSummary ? 'Extracting...' : 'Extract Rider Summary'}
+          </Button>
         </CardContent>
       </Card>
       {performanceData.length > 0 && (
@@ -547,7 +643,7 @@ function ReportsPageContent() {
         <CardContent className="p-4">
           {isLoading ? <div className="text-center py-12">Loading report data...</div> : (
             <>
-              {activeTab === 'performance' && <PerformanceTable data={performanceData} onFocus={handleExecutiveFocus} onExport={() => exportToCsv('performance_summary', performanceData)} />}
+              {activeTab === 'performance' && <PerformanceTable data={filteredPerformanceData} onFocus={handleExecutiveFocus} onExport={() => exportToCsv('performance_summary', filteredPerformanceData)} />}
 
               {activeTab === 'visits' && (
                 <>
