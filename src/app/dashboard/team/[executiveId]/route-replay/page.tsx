@@ -208,7 +208,7 @@ export default function RouteReplayPage() {
 
   return (
     <div className="space-y-6">
-      <Button variant="outline" onClick={() => router.back()}><ArrowLeft className="h-4 w-4 mr-2" /> Back to Team</Button>
+      <Button onClick={() => router.back()} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md"><ArrowLeft className="h-4 w-4 mr-2" /> Back to Team</Button>
       <h2 className="text-2xl font-bold">Route Replay
         {executiveName && (
           <span className="text-gray-500 font-normal text-lg">
