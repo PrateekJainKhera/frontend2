@@ -303,10 +303,7 @@ export default function RouteReplayPage() {
                   <span>{Math.round(animation.progress)}% Complete</span>
                   {replayData.path.length > 0 && animation.currentIndex >= 0 && (
                     <span>
-                      {new Date(replayData.path[animation.currentIndex]?.timestamp || replayData.path[0].timestamp).toLocaleTimeString('en-IN', {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
+                      {(() => { const ts = replayData.path[animation.currentIndex]?.timestamp || replayData.path[0].timestamp; return new Date(ts + 'Z').toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' }); })()}
                     </span>
                   )}
                 </div>
