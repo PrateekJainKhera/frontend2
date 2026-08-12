@@ -25,6 +25,7 @@ interface VisitDetailReport {
   contactPersonName: string | null;
   contactPersonMobile: string | null;
   principalRemarks: string | null;
+  notes: string | null;
   permissionToMeetTeachers: boolean;
   locationVisitCount: number;
   teacherInteractions: {
@@ -122,6 +123,7 @@ export function VisitDetailModal({ isOpen, onClose, visitData, isLoading }: Visi
                           <p className="text-gray-500">No contact name recorded.</p>
                         )}
                         {visitData.contactPersonMobile && <p><strong>Mobile:</strong> {visitData.contactPersonMobile}</p>}
+                        {visitData.notes && <p><strong>Notes:</strong> {visitData.notes}</p>}
                         {visitData.principalRemarks && <p><strong>Remarks:</strong> {visitData.principalRemarks}</p>}
                       </div>
                     </div>

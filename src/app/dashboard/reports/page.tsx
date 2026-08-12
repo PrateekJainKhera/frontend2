@@ -30,7 +30,7 @@ interface PerformanceSummary {
   totalTA: number; totalDA: number; otherExpenses: number;
 }
 
-interface DetailedVisit { id: number; visitDate: string; executiveName: string; locationName: string; locationType: string; area: string; principalRemarks: string | null; locationVisitCount: number; }
+interface DetailedVisit { id: number; visitDate: string; executiveName: string; locationName: string; locationType: string; area: string; principalRemarks: string | null; notes: string | null; locationVisitCount: number; }
 
 interface LocationSummary { locationId: number; locationName: string; locationType: string; area: string; totalVisits: number; lastVisitDate: string; lastVisitExecutive: string; lastVisitId: number; }
 
@@ -68,6 +68,7 @@ interface VisitDetailReport {
   contactPersonName: string | null;
   contactPersonMobile: string | null;
   principalRemarks: string | null;
+  notes: string | null;
   permissionToMeetTeachers: boolean;
   locationVisitCount: number;
   teacherInteractions: {
@@ -254,6 +255,7 @@ function ReportsPageContent() {
           'Contact Person': visit.contactPersonName,
           'Contact Mobile': visit.contactPersonMobile,
           'Remarks': visit.principalRemarks,
+          'Notes': visit.notes,
         };
 
         if (visit.teacherInteractions.length === 0) {
@@ -681,7 +683,7 @@ function ReportsPageContent() {
                     <>
                       <ReportTable
                         data={paginatedVisitData.items}
-                        columns={['id', 'visitDate', 'executiveName', 'locationName', 'locationType', 'area', 'locationVisitCount', 'principalRemarks']}
+                        columns={['id', 'visitDate', 'executiveName', 'locationName', 'locationType', 'area', 'locationVisitCount', 'principalRemarks', 'notes']}
                         onExport={exportVisitLogWithDetails}
                         isExporting={isExporting}
                         activeTab={activeTab}

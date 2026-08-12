@@ -43,6 +43,7 @@ interface StayPoint {
   address?: string;
 }
 interface RouteReplayData {
+  trackingId: number;
   totalDistanceKm: number;
   path: LocationPoint[];
   plannedVisits: PlannedVisit[];
@@ -53,6 +54,7 @@ interface RouteReplayData {
   // Raw start/end points from DB for accurate flag placement
  // rawStartPoint?: LocationPoint;
   rawEndPoint?: LocationPoint;
+  adminRemark: string | null;
 }
 
 export default function RouteReplayPage() {
@@ -67,6 +69,9 @@ export default function RouteReplayPage() {
   const [executiveName, setExecutiveName] = useState('');
   const [speed, setSpeed] = useState<number>(1);
   const [cameraFollow, setCameraFollow] = useState<boolean>(true);
+  const [remarkText, setRemarkText] = useState('');
+  const [isEditingRemark, setIsEditingRemark] = useState(false);
+  const [isSavingRemark, setIsSavingRemark] = useState(false);
   useEffect(() => {
     const fetchExecutiveName = async () => {
       if (!executiveId) return;
@@ -132,6 +137,8 @@ export default function RouteReplayPage() {
         };
 
         setReplayData(transformedData);
+        setRemarkText(transformedData.adminRemark || '');
+        setIsEditingRemark(false);
       } catch (err: any) {
         setError(err.response?.data?.message || "Failed to fetch route history.");
       } finally {
@@ -431,6 +438,86 @@ export default function RouteReplayPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Admin Remarks Card */}
+          {replayData && (
+            <Card className="border border-gray-200 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Admin Remarks</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                {isEditingRemark ? (
+                  <div className="space-y-3">
+                    <textarea
+                      className="w-full border border-gray-300 rounded-lg p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                      rows={3}
+                      value={remarkText}
+                      onChange={e => setRemarkText(e.target.value)}
+                      placeholder="Write a remark for this day..."
+                      autoFocus
+                    />
+                    <div className="flex gap-2 justify-end">
+                      <Button size="sm" variant="outline" onClick={() => { setRemarkText(replayData.adminRemark || ''); setIsEditingRemark(false); }}>
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                        disabled={isSavingRemark}
+                        onClick={async () => {
+                          setIsSavingRemark(true);
+                          try {
+                            await api.patch(`/tracking/${replayData.trackingId}/remark`, { remark: remarkText || null });
+                            setReplayData(prev => prev ? { ...prev, adminRemark: remarkText || null } : prev);
+                            setIsEditingRemark(false);
+                          } finally {
+                            setIsSavingRemark(false);
+                          }
+                        }}
+                      >
+                        {isSavingRemark ? 'Saving...' : 'Save'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="min-h-[48px] mb-3">
+                      {replayData.adminRemark ? (
+                        <p className="text-sm text-gray-700 leading-relaxed bg-yellow-50 border border-yellow-200 rounded-lg p-3 break-words whitespace-pre-wrap overflow-y-auto max-h-40">{replayData.adminRemark}</p>
+                      ) : (
+                        <p className="text-sm text-gray-400 italic">No remark added yet.</p>
+                      )}
+                    </div>
+                    <div className="flex gap-2 justify-end border-t pt-3">
+                      <Button size="sm" variant="outline" className="text-blue-600 border-blue-300 hover:bg-blue-50" onClick={() => setIsEditingRemark(true)}>
+                        {replayData.adminRemark ? '✏️ Edit' : '+ Add Remark'}
+                      </Button>
+                      {replayData.adminRemark && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600 border-red-300 hover:bg-red-50"
+                          disabled={isSavingRemark}
+                          onClick={async () => {
+                            setIsSavingRemark(true);
+                            try {
+                              await api.patch(`/tracking/${replayData.trackingId}/remark`, { remark: null });
+                              setReplayData(prev => prev ? { ...prev, adminRemark: null } : prev);
+                              setRemarkText('');
+                            } finally {
+                              setIsSavingRemark(false);
+                            }
+                          }}
+                        >
+                          🗑️ Delete
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
