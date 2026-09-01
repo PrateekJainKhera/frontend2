@@ -29,6 +29,7 @@ interface PlannedVisit {
   longitude: number | null;
 
   status: number; // 0=Pending, 1=Approved, 3=Completed
+  checkInTime: string | null;
 }
 interface Session {
   startTimeIST: string;
@@ -210,7 +211,8 @@ export default function RouteReplayPage() {
       name: v.locationName,
       latitude: v.latitude!,
       longitude: v.longitude!,
-      status: v.status
+      status: v.status,
+      checkInTime: v.checkInTime
     })) || [];
 
   return (
@@ -372,6 +374,11 @@ export default function RouteReplayPage() {
                         </p>
                         <p className="text-xs text-gray-500">
                           {visit.status === 3 ? 'Completed' : 'Pending'}
+                          {visit.status === 3 && visit.checkInTime && (
+                            <span className="ml-2 text-green-600 font-medium">
+                              {new Date(visit.checkInTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                            </span>
+                          )}
                         </p>
                       </div>
                     </div>
