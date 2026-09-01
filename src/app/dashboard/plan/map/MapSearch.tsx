@@ -13,6 +13,10 @@ export interface GphLocation {
   type: number;
   latitude: number;
   longitude: number;
+  address?: string;
+  city?: string;
+  district?: string;
+  pincode?: string;
 }
 interface GooglePlaceSuggestion {
   place_id: string;

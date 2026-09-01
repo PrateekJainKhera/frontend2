@@ -14,8 +14,10 @@ interface PlaceOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   books: Book[];
+  visitId?: number;
+  teacherId?: number;
   // This function will now be responsible for handling the final order items
-  onConfirmOrder: (items: OrderItem[]) => void; 
+  onConfirmOrder?: (items: OrderItem[]) => void;
 }
 export function PlaceOrderModal({ isOpen, onClose, books, onConfirmOrder }: PlaceOrderModalProps) {
     const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
@@ -41,7 +43,7 @@ export function PlaceOrderModal({ isOpen, onClose, books, onConfirmOrder }: Plac
             alert("Please add at least one item to the order.");
             return;
         }
-        onConfirmOrder(orderItems); // Pass the completed list of items back to the parent page
+        onConfirmOrder?.(orderItems); // Pass the completed list of items back to the parent page
         onClose();
     };
     return (
