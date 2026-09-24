@@ -215,6 +215,17 @@ export default function RouteReplayPage() {
       checkInTime: v.checkInTime
     })) || [];
 
+  // Visit numbers based on check-in time order (earliest = Visit 1)
+  const visitNumberMap = useMemo(() => {
+    const completed = visitMarkers
+      .map((v, i) => ({ v, i }))
+      .filter(({ v }) => v.status === 3 && v.checkInTime)
+      .sort((a, b) => new Date(a.v.checkInTime!).getTime() - new Date(b.v.checkInTime!).getTime());
+    const map = new Map<number, number>(); // originalIndex → visitNumber
+    completed.forEach(({ i }, num) => map.set(i, num + 1));
+    return map;
+  }, [visitMarkers]);
+
   return (
     <div className="space-y-6">
       <Button onClick={() => router.back()} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md"><ArrowLeft className="h-4 w-4 mr-2" /> Back to Team</Button>
@@ -358,14 +369,21 @@ export default function RouteReplayPage() {
             <CardContent className="p-4 max-h-64 overflow-y-auto">
               {isLoading ? <p>Loading...</p> : (
                 <div className="space-y-4">
-                  {visitMarkers.length > 0 ? visitMarkers.map((visit, index) => ( // Add 'index' here
+                  {visitMarkers.length > 0 ? visitMarkers.map((visit, index) => {
+                    const visitNum = visitNumberMap.get(index);
+                    return (
                     <div key={`${visit.id}-${index}`} className="flex items-start gap-3">
-                      {/* The key is now a combination of id and index, e.g., "123-0", "456-1", "123-2" */}
-                      <div className="shrink-0 mt-1">
+                      {/* Visit number badge for completed visits */}
+                      <div className="shrink-0 mt-0.5 flex flex-col items-center gap-1">
                         {visit.status === 3 ? (
                           <CheckCircle className="h-5 w-5 text-green-500" />
                         ) : (
                           <Clock className="h-5 w-5 text-gray-400" />
+                        )}
+                        {visitNum && (
+                          <span className="text-[10px] font-bold bg-blue-600 text-white rounded-full w-5 h-5 flex items-center justify-center leading-none">
+                            {visitNum}
+                          </span>
                         )}
                       </div>
                       <div>
@@ -373,7 +391,9 @@ export default function RouteReplayPage() {
                           {visit.name}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {visit.status === 3 ? 'Completed' : 'Pending'}
+                          {visit.status === 3
+                            ? visitNum ? `Visit ${visitNum} · Completed` : 'Completed'
+                            : 'Pending'}
                           {visit.status === 3 && visit.checkInTime && (
                             <span className="ml-2 text-green-600 font-medium">
                               {new Date(visit.checkInTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
@@ -382,7 +402,8 @@ export default function RouteReplayPage() {
                         </p>
                       </div>
                     </div>
-                  )) : <p className="text-sm text-gray-500">No visits were completed on this day.</p>}
+                    );
+                  }) : <p className="text-sm text-gray-500">No visits were completed on this day.</p>}
                 </div>
               )}
             </CardContent>

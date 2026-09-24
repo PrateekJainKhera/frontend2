@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { UserPlus, Search, Pencil, Route, Eye, ChevronLeft, ChevronRight, Users, UserCheck, UserCog, UserX, Activity } from 'lucide-react';
+import { UserPlus, Search, Pencil, Route, Eye, Users, UserCheck, UserCog, Activity, SlidersHorizontal, X } from 'lucide-react';
 import api from '@/services/api';
 import { useAuthContext } from '@/context/AuthContext';
 import { AddEditUserModal } from './AddEditUserModal';
@@ -52,6 +52,12 @@ export default function TeamManagementPage() {
   const [viewingUser, setViewingUser] = useState<TeamMember | null>(null);
   const [activeTab, setActiveTab] = useState<'active' | 'deactivated' | 'working'>('active');
   const [workingExecutiveIds, setWorkingExecutiveIds] = useState<Set<number>>(new Set());
+  const [executiveDayStatus, setExecutiveDayStatus] = useState<Map<number, 'red' | 'yellow' | 'green'>>(new Map());
+  // Filters & sorting
+  const [sortOrder, setSortOrder] = useState<'role' | 'asc' | 'desc'>('role');
+  const [filterRole, setFilterRole] = useState('All');
+  const [filterArea, setFilterArea] = useState('All');
+  const [filterDayStatus, setFilterDayStatus] = useState('all');
   const fetchTeamMembers = async () => {
     try {
       setIsLoading(true);
@@ -73,10 +79,24 @@ export default function TeamManagementPage() {
     }
   };
 
+  const fetchExecutiveDayStatus = async () => {
+    try {
+      const response = await api.get('/tracking/day-status');
+      const statusMap = new Map<number, 'red' | 'yellow' | 'green'>();
+      response.data.forEach((item: { salesExecutiveId: number; dayStatus: 'red' | 'yellow' | 'green' }) => {
+        statusMap.set(item.salesExecutiveId, item.dayStatus);
+      });
+      setExecutiveDayStatus(statusMap);
+    } catch (error) {
+      console.error('Failed to fetch executive day status:', error);
+    }
+  };
+
   useEffect(() => {
     if (user) {
       fetchTeamMembers();
       fetchWorkingExecutives();
+      fetchExecutiveDayStatus();
     }
   }, [user]);
   const handleStatusToggle = async (userId: number, currentStatus: number) => {
@@ -130,11 +150,36 @@ export default function TeamManagementPage() {
     if (!name) return '';
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
-  const filteredMembers = teamMembers.filter(member =>
-    member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (member.assignedArea && member.assignedArea.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    member.mobileNumber.includes(searchTerm)
+  // Unique areas for the area filter dropdown
+  const uniqueAreas = useMemo(() =>
+    [...new Set(teamMembers.map(m => m.assignedArea).filter((a): a is string => !!a))].sort(),
+    [teamMembers]
   );
+
+  const filteredMembers = useMemo(() => {
+    let members = teamMembers.filter(member =>
+      member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (member.assignedArea && member.assignedArea.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      member.mobileNumber.includes(searchTerm)
+    );
+    if (filterRole !== 'All') members = members.filter(m => m.roleName === filterRole);
+    if (filterArea !== 'All') members = members.filter(m => m.assignedArea === filterArea);
+    if (filterDayStatus !== 'all') members = members.filter(m => executiveDayStatus.get(m.id) === filterDayStatus);
+    return [...members].sort((a, b) => {
+      if (sortOrder === 'role') {
+        const roleOrder: Record<string, number> = { Admin: 0, ASM: 1, Executive: 2 };
+        const roleDiff = (roleOrder[a.roleName] ?? 3) - (roleOrder[b.roleName] ?? 3);
+        if (roleDiff !== 0) return roleDiff;
+        return a.name.localeCompare(b.name);
+      }
+      const cmp = a.name.localeCompare(b.name);
+      return sortOrder === 'asc' ? cmp : -cmp;
+    });
+  }, [teamMembers, searchTerm, filterRole, filterArea, filterDayStatus, sortOrder, executiveDayStatus]);
+
+  const isFiltered = filterRole !== 'All' || filterArea !== 'All' || filterDayStatus !== 'all' || sortOrder !== 'role';
+  const resetFilters = () => { setFilterRole('All'); setFilterArea('All'); setFilterDayStatus('all'); setSortOrder('role'); };
+
   const teamCounts = useMemo(() => {
     return {
       total: teamMembers.length,
@@ -186,19 +231,68 @@ export default function TeamManagementPage() {
           />
         </div>
       </div>
-      {/* <Card>
-        <CardContent className="p-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search by name, area, or contact number..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </CardContent>
-      </Card> */}
+      {/* Filter Bar */}
+      <div className="flex flex-wrap gap-2 items-center bg-white border rounded-lg px-4 py-3">
+        <span className="text-sm font-medium text-gray-500 flex items-center gap-1.5 mr-1">
+          <SlidersHorizontal className="h-4 w-4" /> Filters:
+        </span>
+
+        {/* Sort by Name */}
+        <select
+          value={sortOrder}
+          onChange={e => setSortOrder(e.target.value as 'role' | 'asc' | 'desc')}
+          className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          <option value="role">Sort: Role (Default)</option>
+          <option value="asc">Sort: Name A → Z</option>
+          <option value="desc">Sort: Name Z → A</option>
+        </select>
+
+        {/* Role filter */}
+        <select
+          value={filterRole}
+          onChange={e => setFilterRole(e.target.value)}
+          className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          <option value="All">All Roles</option>
+          <option value="Admin">Admin</option>
+          <option value="ASM">ASM</option>
+          <option value="Executive">Executive</option>
+        </select>
+
+        {/* Area filter */}
+        <select
+          value={filterArea}
+          onChange={e => setFilterArea(e.target.value)}
+          className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          <option value="All">All Areas</option>
+          {uniqueAreas.map(area => <option key={area} value={area}>{area}</option>)}
+        </select>
+
+        {/* Day Status filter */}
+        <select
+          value={filterDayStatus}
+          onChange={e => setFilterDayStatus(e.target.value)}
+          className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          <option value="all">All Day Status</option>
+          <option value="green">🟢 Actively Working</option>
+          <option value="yellow">🟡 Started — No Visits</option>
+          <option value="red">🔴 Not Started</option>
+        </select>
+
+        {/* Reset button — only shows when filters are active */}
+        {isFiltered && (
+          <button
+            onClick={resetFilters}
+            className="flex items-center gap-1 text-sm text-red-500 hover:text-red-700 border border-red-200 rounded-md px-2 py-1.5 hover:bg-red-50 transition-colors"
+          >
+            <X className="h-3.5 w-3.5" /> Reset
+          </button>
+        )}
+      </div>
+
       <Card>
         <CardHeader className="p-0">
           {/* --- NAYA CHANGE: Tabs UI add karein --- */}
@@ -256,12 +350,21 @@ export default function TeamManagementPage() {
                         <div>
                           <div className="flex items-center gap-1.5">
                             <p className="font-medium text-gray-900">{member.name}</p>
-                            {workingExecutiveIds.has(member.id) && (
-                              <span className="relative flex h-2.5 w-2.5" title="Currently Working">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                              </span>
-                            )}
+                            {member.roleName === 'Executive' && (() => {
+                              const status = executiveDayStatus.get(member.id);
+                              if (!status) return null;
+                              const cfg = {
+                                green:  { ping: 'bg-green-400',  dot: 'bg-green-500',  label: 'Actively Working' },
+                                yellow: { ping: 'bg-yellow-400', dot: 'bg-yellow-500', label: 'Started Day — No Visits Yet' },
+                                red:    { ping: 'bg-red-400',    dot: 'bg-red-500',    label: 'Not Started Day' },
+                              }[status];
+                              return (
+                                <span className="relative flex h-2.5 w-2.5" title={cfg.label}>
+                                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${cfg.ping} opacity-75`}></span>
+                                  <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${cfg.dot}`}></span>
+                                </span>
+                              );
+                            })()}
                           </div>
                           <p className="text-sm text-gray-600">@{member.username}</p>
                         </div>
